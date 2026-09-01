@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;">
+  <title>SuperAdmin Portal — Study Island</title>
+
+  <!-- AUTH GUARD: Must be first — redirect before any React code loads -->
+  <script>
+    (function () {
+      try {
+        var raw = localStorage.getItem('edtech_user') || localStorage.getItem('edtech_superadmin_user');
+        if (!raw && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+          var devUser = { uid: 'sa_dev_1', name: 'SuperAdmin Dev', email: 'admin@platform.com', role: 'super_admin' };
+          localStorage.setItem('edtech_user', JSON.stringify(devUser));
+          raw = JSON.stringify(devUser);
+        }
+        if (!raw) { window.location.replace('/login.html'); return; }
+        var u = JSON.parse(raw);
+        if (!u || !u.uid) { window.location.replace('/login.html'); return; }
+        if (u.role !== 'super_admin' && u.role !== 'superadmin') {
+          window.location.replace('/login.html');
+        }
+      } catch (e) {
+        window.location.replace('/login.html');
+      }
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons (Matching Platform Icons) -->
+  <link rel="stylesheet" type="text/css" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
+  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+  <!-- Google 3D Model Viewer for GLB/GLTF Preview -->
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>

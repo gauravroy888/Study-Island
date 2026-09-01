@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LM2596 Interactive Viewer</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>LM2596 12V to 5V (3A) Buck Converter</h1>
+            <div class="toggle-container">
+                <button id="btn-schematic" class="active">Schematic View</button>
+                <button id="btn-layout">PCB Layout View</button>
+            </div>
+        </header>
+
+        <main>
+            <div id="canvas-container">
+                <svg id="schematic-svg" class="view active" viewBox="0 0 800 500"></svg>
+                <svg id="layout-svg" class="view" viewBox="0 0 800 500"></svg>
+            </div>
+
+            <aside id="info-panel">
+                <h2>Component Info</h2>
+                <div id="bom-details">
+                    <p class="placeholder-text">Hover over a component to view its details.</p>
+                </div>
+            </aside>
+        </main>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>

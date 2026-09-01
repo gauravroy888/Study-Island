@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognitive Island for Schools | Empower Your Students</title>
+    <meta name="description" content="Bring the future of interactive learning to your school with Cognitive Island.">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="styles.css">
+    
+    <style>
+        .hero-b2b {
+            background-image: url('assets/images/Schooln.jpg');
+            align-items: flex-start;
+            padding-top: 200px;
+        }
+        
+        .b2b-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 2;
+        }
+
+        .b2b-content h1 {
+            font-size: 3.5rem;
+            line-height: 1.1;
+            margin-bottom: 20px;
+        }
+
+        .b2b-content p {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 900px) {
+            .b2b-layout { grid-template-columns: 1fr; }
+            .hero-b2b { padding-top: 150px; }
+            .b2b-content h1 { font-size: 2.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Interactive Dot Background -->
+    <div class="dot-background"></div>
+
+    <!-- Navigation -->
+    <nav class="glass">
+        <div class="logo">
+            <span>🧠</span>
+            <span class="text-gradient">Cognitive Island</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#path">Paths</a></li>
+            <li><a href="pricing.html">Pricing</a></li>
+            <li><a href="#" class="active">For Schools</a></li>
+        </ul>
+        <div class="nav-actions">
+            <a href="b2b.html" class="btn btn-primary">Sign Up</a>
+            <a href="login.html" class="btn btn-secondary">Portal Login</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero hero-b2b">
+        <div class="b2b-layout">
+            <div class="b2b-content">
+                <span class="hero-subtitle">B2B Solutions</span>
+                <h1>Empower your school with <span class="text-gradient">Cognitive Island</span></h1>
+                <p>Bring an immersive, interactive, and gamified learning environment directly to your classrooms. Enhance student engagement, track detailed analytics, and customize curriculum paths.</p>
+                
+                <div style="display: flex; gap: 20px; margin-top: 40px;">
+                    <div class="stat-item">
+                        <h4 style="font-size: 1.5rem; color: var(--primary-color);">500+</h4>
+                        <p>Schools Onboarded</p>
+                    </div>
+                    <div class="stat-item">
+                        <h4 style="font-size: 1.5rem; color: var(--accent-purple);">2M+</h4>
+                        <p>Active Students</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Form -->
+            <div class="b2b-form-container glass-card">
+                <h3 style="margin-bottom: 20px; font-size: 1.5rem;">Partner With Us</h3>
+                <form id="b2bForm">
+                    <div class="form-group">
+                        <label for="schoolName">School/Institution Name</label>
+                        <input type="text" id="schoolName" class="form-control" placeholder="e.g. Springfield High School" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="contactName">Contact Person</label>
+                        <input type="text" id="contactName" class="form-control" placeholder="Your Name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Work Email</label>
+                        <input type="email" id="email" class="form-control" placeholder="email@school.edu" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="students">Number of Students</label>
+                        <select id="students" class="form-control" required>
+                            <option value="" disabled selected>Select size</option>
+                            <option value="1-500">1 - 500</option>
+                            <option value="501-2000">501 - 2,000</option>
+                            <option value="2000+">2,000+</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Request Demo</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 Cognitive Island. All rights reserved.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

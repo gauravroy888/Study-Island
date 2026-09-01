@@ -1,0 +1,129 @@
+.mentors-header {
+  margin-bottom: 24px;
+}
+
+.mentors-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mentors-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.mentor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  transition: all 0.2s;
+}
+
+.mentor-row:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.mentor-info-block {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 2;
+}
+
+.mentor-avatar.large {
+  width: 50px;
+  height: 50px;
+}
+
+.mentor-avatar.large .status-dot {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+}
+
+.mentor-name {
+  font-size: 16px;
+  margin: 0 0 4px 0;
+}
+
+.mentor-title {
+  font-size: 13px;
+  margin: 0 0 4px 0;
+}
+
+.mentor-subject {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.subject-badge {
+  background: rgba(255,255,255,0.05);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.mentor-rating {
+  flex: 0.5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.rating-val {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.mentor-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+/* Responsive Styles */
+@media (max-width: 1024px) {
+  .mentors-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .mentors-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 768px) {
+  .mentor-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .mentor-row-actions {
+    width: 100%;
+    justify-content: flex-start;
+    margin-top: 12px;
+  }
+  
+  .mentors-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

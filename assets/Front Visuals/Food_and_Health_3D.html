@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Food & Health — Interactive Bio-Link Visual</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #020617;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      color: #ffffff;
+    }
+
+    /* Ambient Space & Bio Grid Background */
+    .bg-stage {
+      position: absolute;
+      inset: 0;
+      background: 
+        radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.15) 0%, rgba(2, 6, 23, 0.95) 70%),
+        radial-gradient(circle at 20% 80%, rgba(34, 197, 94, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.08) 0%, transparent 40%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Top Left Header Badge */
+    .header-badge {
+      position: absolute;
+      top: 16px;
+      left: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 16px;
+      background: rgba(8, 14, 30, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(56, 189, 248, 0.32);
+      border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      pointer-events: auto;
+      z-index: 10;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .header-badge:hover {
+      border-color: rgba(56, 189, 248, 0.6);
+      box-shadow: 0 8px 32px rgba(0, 200, 255, 0.25);
+    }
+
+    .badge-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(34, 197, 94, 0.25));
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 0 16px rgba(239, 68, 68, 0.3);
+    }
+
+    .badge-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .badge-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: #ffffff;
+      text-transform: uppercase;
+    }
+
+    .badge-sub {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #38bdf8;
+      opacity: 0.9;
+      letter-spacing: 0.03em;
+    }
+
+    /* Top Right Two-Line Bio-Link Status Badge */
+    .bio-status-badge {
+      position: absolute;
+      top: 16px;
+      right: 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 18px;
+      background: rgba(8, 14, 30, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      z-index: 10;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .status-dot-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #00f0ff;
+      box-shadow: 0 0 12px #00f0ff;
+      animation: pulseDot 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.4); opacity: 0.5; }
+    }
+
+    .status-text-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .status-line-1 {
+      font-size: 12.5px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      color: #ffffff;
+      text-transform: uppercase;
+    }
+
+    .status-line-2 {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #00f0ff;
+      letter-spacing: 0.04em;
+    }
+
+    /* Main Visual Canvas Stage */
+    #bio-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Space Stage -->
+  <div class="bg-stage"></div>
+
+  <!-- Header Badge -->
+  <div class="header-badge">
+    <div class="badge-icon">🍎</div>
+    <div class="badge-text">
+      <span class="badge-title">Food &amp; Health</span>
+      <span class="badge-sub">Nutrition to Vitality Bio-Link</span>
+    </div>
+  </div>
+
+  <!-- Top Right Two-Line Explanation Badge -->
+  <div class="bio-status-badge" id="bio-badge">
+    <div class="status-dot-wrap">
+      <span class="status-dot" id="status-dot"></span>
+    </div>
+    <div class="status-text-wrap">
+      <div class="status-line-1" id="status-line-1">🍎 FRUITS (VITAMINS &amp; IRON)</div>
+      <div class="status-line-2" id="status-line-2">➔ 🛡️ IMMUNE SHIELD &amp; VISION</div>
+    </div>
+  </div>
+
+  <!-- Clean Interactive 2D Bio-Visual Canvas -->
+  <canvas id="bio-canvas"></canvas>
+
+  <script>
+    (function () {
+      const canvas = document.getElementById("bio-canvas");
+      const ctx = canvas.getContext("2d");
+      const statusLine1 = document.getElementById("status-line-1");
+      const statusLine2 = document.getElementById("status-line-2");
+      const statusDot = document.getElementById("status-dot");
+      const bioBadge = document.getElementById("bio-badge");
+
+      let width = window.innerWidth;
+      let height = window.innerHeight;
+
+      function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width * window.devicePixelRatio;
+        canvas.height = height * window.devicePixelRatio;
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      // Food Orbital Nodes Data
+      const FOODS = [
+        {
+          id: 'vitamins',
+          icon: '🍎',
+          name: 'FRUITS',
+          nutrient: 'VITAMINS & IRON',
+          color: '#ef4444',
+          glow: 'rgba(239, 68, 68, 0.6)',
+          target: 'shield',
+          benefit: 'IMMUNE SHIELD & VISION',
+          organIcon: '🛡️',
+          organPos: { x: 0, y: -45 },
+          angle: -Math.PI * 0.5 // Top
+        },
+        {
+          id: 'dairy',
+          icon: '🥛',
+          name: 'MILK',
+          nutrient: 'CALCIUM & VIT D',
+          color: '#38bdf8',
+          glow: 'rgba(56, 189, 248, 0.6)',
+          target: 'bones',
+          benefit: 'STRONG BONES & TEETH',
+          organIcon: '🦴',
+          organPos: { x: -28, y: 55 },
+          angle: -Math.PI * 0.18 // Top Right
+        },
+        {
+          id: 'protein',
+          icon: '🥩',
+          name: 'PROTEIN',
+          nutrient: 'AMINO ACIDS',
+          color: '#a855f7',
+          glow: 'rgba(168, 85, 247, 0.6)',
+          target: 'muscles',
+          benefit: 'MUSCLE GROWTH & REPAIR',
+          organIcon: '💪',
+          organPos: { x: 42, y: -10 },
+          angle: Math.PI * 0.18 // Bottom Right
+        },
+        {
+          id: 'carbs',
+          icon: '🍞',
+          name: 'GRAINS',
+          nutrient: 'COMPLEX CARBS',
+          color: '#f59e0b',
+          glow: 'rgba(245, 158, 11, 0.6)',
+          target: 'brain',
+          benefit: 'BRAIN FOCUS & ENERGY',
+          organIcon: '🧠',
+          organPos: { x: 0, y: -90 },
+          angle: Math.PI * 0.5 // Bottom
+        },
+        {
+          id: 'fats',
+          icon: '🥑',
+          name: 'FATS',
+          nutrient: 'OMEGA LIPIDS',
+          color: '#22c55e',
+          glow: 'rgba(34, 197, 94, 0.6)',
+          target: 'heart',
+          benefit: 'HEART & ARTERY HEALTH',
+          organIcon: '❤️',
+          organPos: { x: 0, y: -20 },
+          angle: Math.PI * 0.82 // Bottom Left
+        },
+        {
+          id: 'water',
+          icon: '💧',
+          name: 'WATER',
+          nutrient: 'HYDRATION & FIBER',
+          color: '#00f0ff',
+          glow: 'rgba(0, 240, 255, 0.6)',
+          target: 'vitality',
+          benefit: 'TOTAL BODY VITALITY',
+          organIcon: '⚡',
+          organPos: { x: 0, y: 15 },
+          angle: -Math.PI * 0.82 // Top Left
+        }
+      ];
+
+      let selectedIndex = 0;
+      let autoCycleTimer = 0;
+      let hoveredIndex = -1;
+
+      // Particles flowing along energy beams
+      const beamParticles = [];
+      for (let i = 0; i < 40; i++) {
+        beamParticles.push({
+          progress: Math.random(),
+          speed: 0.008 + Math.random() * 0.012,
+          size: 2.0 + Math.random() * 2.5
+        });
+      }
+
+      // Mouse Interaction
+      let mouseX = 0, mouseY = 0;
+      window.addEventListener("mousemove", (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+        checkHover();
+      });
+
+      window.addEventListener("click", (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+        checkClick();
+      });
+
+      function getCenter() {
+        return { x: width * 0.5, y: height * 0.52 };
+      }
+
+      function getOrbitRadius() {
+        return Math.min(width, height) * 0.33;
+      }
+
+      function checkHover() {
+        const center = getCenter();
+        const r = getOrbitRadius();
+        hoveredIndex = -1;
+
+        FOODS.forEach((food, idx) => {
+          const fx = center.x + Math.cos(food.angle) * r;
+          const fy = center.y + Math.sin(food.angle) * r;
+          const dist = Math.hypot(mouseX - fx, mouseY - fy);
+          if (dist < 46) {
+            hoveredIndex = idx;
+          }
+        });
+      }
+
+      function checkClick() {
+        if (hoveredIndex !== -1) {
+          selectedIndex = hoveredIndex;
+          autoCycleTimer = 0;
+          updateBadge();
+        }
+      }
+
+      function updateBadge() {
+        const food = FOODS[selectedIndex];
+        statusLine1.textContent = `${food.icon} ${food.name} (${food.nutrient})`;
+        statusLine2.textContent = `➔ ${food.organIcon} ${food.benefit}`;
+        statusLine2.style.color = food.color;
+        statusDot.style.background = food.color;
+        statusDot.style.boxShadow = `0 0 12px ${food.color}`;
+        bioBadge.style.borderColor = food.color;
+      }
+      updateBadge();
+
+      // Main Render Loop
+      let t = 0;
+
+      function render() {
+        t += 0.02;
+        autoCycleTimer += 0.016;
+        if (autoCycleTimer > 4.5 && hoveredIndex === -1) {
+          selectedIndex = (selectedIndex + 1) % FOODS.length;
+          autoCycleTimer = 0;
+          updateBadge();
+        }
+
+        ctx.clearRect(0, 0, width, height);
+
+        const center = getCenter();
+        const orbitRadius = getOrbitRadius();
+        const activeFood = FOODS[selectedIndex];
+
+        // 1. Draw Concentric Orbital Energy Rings
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, orbitRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.12)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 8]);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, orbitRadius * 0.65, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+
+        // 2. Draw Energy Beam from Active Food to Center Organ
+        const activeFoodX = center.x + Math.cos(activeFood.angle) * orbitRadius;
+        const activeFoodY = center.y + Math.sin(activeFood.angle) * orbitRadius;
+        const organX = center.x + activeFood.organPos.x;
+        const organY = center.y + activeFood.organPos.y;
+
+        // Glowing Energy Laser Curve
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(activeFoodX, activeFoodY);
+        const cpX = (activeFoodX + organX) * 0.5 + Math.sin(t * 2) * 20;
+        const cpY = (activeFoodY + organY) * 0.5 + Math.cos(t * 2) * 20;
+        ctx.quadraticCurveTo(cpX, cpY, organX, organY);
+        ctx.strokeStyle = activeFood.glow;
+        ctx.lineWidth = 4.5;
+        ctx.shadowColor = activeFood.color;
+        ctx.shadowBlur = 18;
+        ctx.stroke();
+
+        // Core White Laser
+        ctx.beginPath();
+        ctx.moveTo(activeFoodX, activeFoodY);
+        ctx.quadraticCurveTo(cpX, cpY, organX, organY);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+
+        // Flowing Energy Photons along Beam
+        beamParticles.forEach(bp => {
+          bp.progress += bp.speed;
+          if (bp.progress > 1) bp.progress = 0;
+
+          // Quadratic interpolation
+          const p0 = { x: activeFoodX, y: activeFoodY };
+          const p1 = { x: cpX, y: cpY };
+          const p2 = { x: organX, y: organY };
+
+          const px = (1 - bp.progress) * (1 - bp.progress) * p0.x + 2 * (1 - bp.progress) * bp.progress * p1.x + bp.progress * bp.progress * p2.x;
+          const py = (1 - bp.progress) * (1 - bp.progress) * p0.y + 2 * (1 - bp.progress) * bp.progress * p1.y + bp.progress * bp.progress * p2.y;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(px, py, bp.size, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowColor = activeFood.color;
+          ctx.shadowBlur = 10;
+          ctx.fill();
+          ctx.restore();
+        });
+
+        // 3. Draw Center Human Silhouette & Bio-Shield
+        ctx.save();
+
+        // Pulsing Bio-Shield around body
+        const shieldPulse = Math.sin(t * 3) * 6;
+        ctx.beginPath();
+        ctx.arc(center.x, center.y - 10, 115 + shieldPulse, 0, Math.PI * 2);
+        ctx.strokeStyle = activeFood.glow;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = activeFood.color;
+        ctx.shadowBlur = 16;
+        ctx.stroke();
+
+        // Central Avatar Silhouette Body
+        ctx.translate(center.x, center.y);
+
+        // Head
+        ctx.beginPath();
+        ctx.arc(0, -90, 22, 0, Math.PI * 2);
+        ctx.fillStyle = '#1e293b';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+
+        // Torso / Chest
+        ctx.beginPath();
+        ctx.roundRect(-26, -60, 52, 75, 16);
+        ctx.fillStyle = '#0f172a';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+
+        // Arms (Left & Right)
+        ctx.beginPath();
+        ctx.roundRect(-46, -55, 14, 65, 8); // Left arm
+        ctx.roundRect(32, -55, 14, 65, 8);  // Right arm
+        ctx.fillStyle = '#0f172a';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
+        ctx.fill();
+        ctx.stroke();
+
+        // Legs (Left & Right)
+        ctx.beginPath();
+        ctx.roundRect(-22, 22, 16, 75, 8); // Left leg
+        ctx.roundRect(6, 22, 16, 75, 8);   // Right leg
+        ctx.fillStyle = '#0f172a';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
+        ctx.fill();
+        ctx.stroke();
+
+        // Highlight Active Organ with Kinetic Glowing Icon
+        ctx.save();
+        ctx.translate(activeFood.organPos.x, activeFood.organPos.y);
+        const organScale = 1.0 + Math.sin(t * 4) * 0.15;
+        ctx.scale(organScale, organScale);
+
+        // Organ Glowing Ring
+        ctx.beginPath();
+        ctx.arc(0, 0, 24, 0, Math.PI * 2);
+        ctx.fillStyle = activeFood.glow;
+        ctx.shadowColor = activeFood.color;
+        ctx.shadowBlur = 24;
+        ctx.fill();
+
+        ctx.font = "24px 'Plus Jakarta Sans', sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(activeFood.organIcon, 0, 2);
+        ctx.restore();
+
+        ctx.restore();
+
+        // 4. Draw Orbital Food Nodes
+        FOODS.forEach((food, idx) => {
+          const fx = center.x + Math.cos(food.angle) * orbitRadius;
+          const fy = center.y + Math.sin(food.angle) * orbitRadius;
+          const isSel = (idx === selectedIndex);
+          const isHov = (idx === hoveredIndex);
+
+          ctx.save();
+          ctx.translate(fx, fy);
+
+          const nodeScale = isSel ? (1.18 + Math.sin(t * 3) * 0.05) : (isHov ? 1.15 : 1.0);
+          ctx.scale(nodeScale, nodeScale);
+
+          // Node Outer Glow Ring
+          ctx.beginPath();
+          ctx.arc(0, 0, 36, 0, Math.PI * 2);
+          ctx.fillStyle = isSel ? food.glow : (isHov ? 'rgba(56, 189, 248, 0.25)' : 'rgba(15, 23, 42, 0.85)');
+          ctx.strokeStyle = isSel ? food.color : 'rgba(56, 189, 248, 0.35)';
+          ctx.lineWidth = isSel ? 3 : 1.5;
+          if (isSel) {
+            ctx.shadowColor = food.color;
+            ctx.shadowBlur = 22;
+          }
+          ctx.fill();
+          ctx.stroke();
+
+          // Food Emoji Icon
+          ctx.font = "26px 'Plus Jakarta Sans', sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(food.icon, 0, -2);
+
+          // Food Label Pill Under Icon
+          ctx.font = "bold 9.5px 'Plus Jakarta Sans', sans-serif";
+          ctx.fillStyle = isSel ? '#ffffff' : '#94a3b8';
+          ctx.fillText(food.name, 0, 24);
+
+          ctx.restore();
+        });
+
+        requestAnimationFrame(render);
+      }
+
+      render();
+    })();
+  </script>
+</body>
+</html>

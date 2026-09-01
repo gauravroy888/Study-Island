@@ -1,0 +1,9 @@
+.custom-card, .glass-panel {
+  background: rgba(13, 20, 36, 0.75) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(0, 240, 255, 0.15) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4) !important;
+  padding: 24px;
+}

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master EdTech Ecosystem Architecture Blueprint</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Mermaid JS for Visual Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'dark',
+            fontFamily: 'Inter, sans-serif',
+            flowchart: { curve: 'basis' }
+        });
+    </script>
+
+    <style>
+        :root {
+            --bg-primary: #0A0F1D;
+            --bg-card: #111827;
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --accent-cyan: #00F0FF;
+            --accent-blue: #3B82F6;
+            --accent-purple: #8B5CF6;
+            --accent-pink: #EC4899;
+            --accent-green: #10B981;
+            --accent-amber: #F59E0B;
+            --text-primary: #F9FAFB;
+            --text-secondary: #9CA3AF;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--panel-border);
+            padding-bottom: 20px;
+            margin-bottom: 40px;
+        }
+
+        .title-group h1 {
+            font-size: 32px;
+            font-weight: 800;
+            margin: 0;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .title-group p {
+            color: var(--text-secondary);
+            margin: 5px 0 0 0;
+            font-size: 14px;
+        }
+
+        .btn-print {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            color: #000;
+            font-weight: 700;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+            transition: all 0.3s;
+        }
+
+        .btn-print:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.5);
+        }
+
+        .section-card {
+            background: var(--bg-card);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .section-card h2 {
+            font-size: 22px;
+            margin-top: 0;
+            color: var(--accent-cyan);
+            border-left: 4px solid var(--accent-cyan);
+            padding-left: 12px;
+            margin-bottom: 20px;
+        }
+
+        .mermaid-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--panel-border);
+            margin: 20px 0;
+            overflow-x: auto;
+            text-align: center;
+        }
+
+        .badge-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .badge-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .badge-card h4 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: var(--accent-cyan);
+        }
+
+        .badge-card p {
+            margin: 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--panel-border);
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--accent-cyan);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            font-size: 14px;
+        }
+
+        .formula-card {
+            background: rgba(0, 240, 255, 0.05);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Fira Code', monospace;
+            color: var(--accent-cyan);
+            font-size: 15px;
+        }
+
+        code {
+            font-family: 'Fira Code', monospace;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--accent-cyan);
+        }
+
+        @media print {
+            body {
+                background-color: #fff !important;
+                color: #000 !important;
+                padding: 0;
+            }
+            .btn-print {
+                display: none;
+            }
+            .section-card {
+                background: #fff !important;
+                color: #000 !important;
+                border: 1px solid #ccc !important;
+                box-shadow: none !important;
+                page-break-inside: avoid;
+            }
+            .mermaid-box {
+                background: #f9f9f9 !important;
+                border: 1px solid #ddd !important;
+            }
+            th {
+                background: #f0f0f0 !important;
+                color: #000 !important;
+            }
+            td {
+                color: #333 !important;
+            }
+            .formula-card {
+                background: #f0fdfa !important;
+                border: 1px solid #0d9488 !important;
+                color: #0f766e !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <!-- Top Header -->
+    <div class="header-bar">
+        <div class="title-group">
+            <h1>Master EdTech Ecosystem Architecture Blueprint</h1>
+            <p>Unified Technical Specification & Data Flow Architecture • Executive Report</p>
+        </div>
+        <button class="btn-print" onclick="window.print()">
+            📥 Export / Save as PDF
+        </button>
+    </div>
+
+    <!-- Section 1: Master System Architecture -->
+    <div class="section-card">
+        <h2>1. Master System Architecture Diagram</h2>
+        <p>This master diagram depicts the complete flow between all 5 Stakeholder Portals, the Study Island 3D Content Engine, the Performance Analytics Engine, and the hybrid Supabase + Cloudflare R2 infrastructure.</p>
+
+        <div class="mermaid-box">
+            <pre class="mermaid">
+graph TD
+    subgraph Portals["📱 1. Stakeholder Portal Layer"]
+        SA["👑 Super Admin Panel<br>(Multi-School B2B & AI Costs)"]
+        A["🏢 School Admin Panel<br>(Class Staffing, Timetable & Attendance)"]
+        T["👩‍🏫 Teacher Portal<br>(Meet Live Stream, Custom Tests, Gradebook)"]
+        S["👦 Student Portal & Study Island<br>(3D Sims, Virtual Labs, Quizzes, XR, Stories)"]
+        P["👨‍👩‍👧 Parent Portal<br>(Attendance, Weekly Skills & Progress Reports)"]
+    end
+
+    subgraph DataPillars["📊 2. Performance Analytics Engine Ingestion"]
+        Pillar1["💡 1. 3D Chapter Experience Completion Data"]
+        Pillar2["📚 2. Videos Watched Data (%)"]
+        Pillar3["🧪 3. Experiment Gameplay Score Data"]
+        Pillar4["🔷 4. Platform Premade Quizzes (50% Weight)"]
+        Pillar5["🔶 5. Teacher-Created Tests (50% Weight)"]
+    end
+
+    subgraph AnalyticsEngine["🧠 3. Performance Analytics Engine"]
+        AcademicEval["⚖️ Academic Assessment Evaluator<br>(50% Platform Quizzes + 50% Teacher Tests)"]
+        ExperientialEval["🎮 Experiential Engagement Evaluator<br>(3D Sims + Video Watches + Lab Scores)"]
+        CompositeIndex["🌟 Master Composite Learning Index<br>(70% Academic + 30% Experiential)"]
+    end
+
+    subgraph DatabaseLayer["🛡️ 4. Supabase Core (PostgreSQL & Auth RLS)"]
+        AuthRLS["Supabase Auth & Tenant RLS Security"]
+        PostgresDB[("PostgreSQL Database<br>• performance_analytics_engine tables<br>• User Profiles & Tenant IDs<br>• Test Results & Remediations")]
+    end
+
+    subgraph AssetLayer["🚀 5. Cloudflare R2 + CDN Layer ($0 Egress)"]
+        CFCDN["Cloudflare Global Edge CDN"]
+        HeavyStorage[("Cloudflare R2 Bucket<br>• 3D GLTF/GLB Models<br>• HD Video & Audio<br>• PDF Worksheets")]
+    end
+
+    Portals --> AuthRLS --> PostgresDB
+    S -- "Streams 3D Media" --> CFCDN --> HeavyStorage
+    S --> Pillar1 & Pillar2 & Pillar3 & Pillar4
+    T --> Pillar5
+    Pillar4 & Pillar5 --> AcademicEval
+    Pillar1 & Pillar2 & Pillar3 --> ExperientialEval
+    AcademicEval & ExperientialEval --> CompositeIndex --> PostgresDB
+    PostgresDB --> SA & A & T & S & P
+            </pre>
+        </div>
+    </div>
+
+    <!-- Section 2: Performance Analytics Engine -->
+    <div class="section-card">
+        <h2>2. Performance Analytics Engine & 5-Pillar Ingestion</h2>
+        <p>The <strong>Performance Analytics Engine</strong> synthesizes 5 distinct data streams into a holistic student proficiency profile:</p>
+
+        <div class="badge-grid">
+            <div class="badge-card">
+                <h4>💡 1. 3D Chapter Experience</h4>
+                <p>Tracks scene journey completion & 3D mesh spatial exploration time.</p>
+            </div>
+            <div class="badge-card">
+                <h4>📚 2. Videos Watched (%)</h4>
+                <p>Tracks video watch completion rate & rewind heatmaps.</p>
+            </div>
+            <div class="badge-card">
+                <h4>🧪 3. Experiment Gameplay</h4>
+                <p>Measures virtual lab scores in Shadow Lab & Laser Bounce.</p>
+            </div>
+            <div class="badge-card">
+                <h4>🔷 4. Platform Quizzes (50%)</h4>
+                <p>Deep concept diagnostic metadata driving 3D remediations.</p>
+            </div>
+            <div class="badge-card">
+                <h4>🔶 5. Teacher Tests (50%)</h4>
+                <p>Ingests macro result marks directly into official gradebook.</p>
+            </div>
+        </div>
+
+        <div class="formula-card">
+            <strong>Academic Score Formula (50/50 Rule):</strong><br>
+            Academic Score = 0.50 × (Platform Quiz Score) + 0.50 × (Teacher Test Score)<br><br>
+            <strong>Practical Effort Score Formula:</strong><br>
+            Practical Score = 0.40 × (Lab Gameplay Score) + 0.35 × (3D Sim Completion %) + 0.25 × (Video Watch %)<br><br>
+            <strong>Master Composite Score:</strong><br>
+            Composite Learning Index = 0.70 × (Academic Score) + 0.30 × (Practical Score)
+        </div>
+    </div>
+
+    <!-- Section 3: Database Tables & SQL -->
+    <div class="section-card">
+        <h2>3. Supabase Database Schema (Performance Analytics Engine)</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Table Name</th>
+                    <th>Primary Purpose</th>
+                    <th>Key Columns</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>performance_analytics_engine_summary</code></td>
+                    <td>Aggregated student performance & 50/50 split</td>
+                    <td>student_id, academic_score_50_50, composite_performance_score</td>
+                </tr>
+                <tr>
+                    <td><code>performance_analytics_engine_experiment_logs</code></td>
+                    <td>Virtual lab gameplay scores & trials</td>
+                    <td>experiment_name, gameplay_score, time_spent_seconds</td>
+                </tr>
+                <tr>
+                    <td><code>performance_analytics_engine_video_logs</code></td>
+                    <td>Video watch % and rewind heatmaps</td>
+                    <td>video_title, watch_percentage, rewind_timestamps</td>
+                </tr>
+                <tr>
+                    <td><code>performance_analytics_engine_chapter_logs</code></td>
+                    <td>3D Chapter simulation completion status</td>
+                    <td>chapter_name, is_completed, exploration_seconds</td>
+                </tr>
+                <tr>
+                    <td><code>performance_analytics_engine_teacher_test_logs</code></td>
+                    <td>Macro marks from teacher custom tests</td>
+                    <td>test_id, score_achieved, max_score, result_percentage</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Section 4: Hybrid Storage Strategy -->
+    <div class="section-card">
+        <h2>4. Hybrid Storage Model (Supabase DB + Cloudflare R2 $0 Egress)</h2>
+        <p>By pairing <strong>Supabase PostgreSQL</strong> for relational tables with <strong>Cloudflare R2</strong> for heavy binary assets, egress bandwidth fees are reduced by <strong>over 98%</strong>!</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Asset Type</th>
+                    <th>Storage Location</th>
+                    <th>Cost & Performance Benefit</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>User Profiles, Auth, Scores, Telemetry</strong></td>
+                    <td>🛡️ Supabase PostgreSQL</td>
+                    <td>ACID compliance, RLS security, real-time channels</td>
+                </tr>
+                <tr>
+                    <td><strong>3D GLTF/GLB Scene Models (20MB-150MB)</strong></td>
+                    <td>🚀 Cloudflare R2 CDN</td>
+                    <td>$0 egress fees, sub-50ms instant loading edge caching</td>
+                </tr>
+                <tr>
+                    <td><strong>HD Video Stories & Audio Lessons</strong></td>
+                    <td>🚀 Cloudflare R2 CDN</td>
+                    <td>High-bandwidth media streaming with zero data transfer cost</td>
+                </tr>
+                <tr>
+                    <td><strong>Lab Worksheets & PDF Documents</strong></td>
+                    <td>🚀 Cloudflare R2 CDN</td>
+                    <td>Global CDN edge caching for fast document delivery</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+</body>
+</html>

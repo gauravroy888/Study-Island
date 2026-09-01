@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognitive Island | Pricing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .pricing-hero {
+            background-image: url('assets/images/hero_bg%20V2.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 120px 5% 80px;
+            position: relative;
+        }
+
+        .pricing-hero::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(3, 7, 18, 0.7);
+            z-index: 0;
+        }
+
+        .pricing-header {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            margin-bottom: 60px;
+            max-width: 800px;
+        }
+
+        .pricing-header h1 {
+            font-size: 2.8rem;
+            margin-bottom: 15px;
+        }
+
+        .pricing-header p {
+            font-size: 1rem;
+            color: var(--text-muted);
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .pricing-card {
+            background: rgba(10, 10, 20, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 40px rgba(0, 242, 254, 0.15);
+        }
+
+        .pricing-card.featured {
+            border: 1px solid var(--primary-color);
+            background: rgba(0, 242, 254, 0.05);
+            transform: scale(1.05);
+        }
+
+        .pricing-card.featured:hover {
+            transform: scale(1.05) translateY(-10px);
+            box-shadow: var(--glow-primary);
+        }
+
+        .pricing-icon {
+            font-size: 2.4rem;
+            margin-bottom: 15px;
+        }
+
+        .pricing-tier {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .pricing-price {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pricing-price span {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-left: 8px;
+        }
+
+        .pricing-features {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 25px 0;
+            text-align: left;
+        }
+
+        .pricing-features li {
+            margin-bottom: 12px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pricing-features li::before {
+            content: '✓';
+            color: var(--primary-color);
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        @media (max-width: 900px) {
+            .pricing-card.featured {
+                transform: scale(1);
+            }
+            .pricing-card.featured:hover {
+                transform: translateY(-10px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dot-background"></div>
+
+    <nav class="glass">
+        <div class="logo">
+            <span>🧠</span>
+            <a href="index.html" class="text-gradient">Cognitive Island</a>
+        </div>
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="features.html">Features</a></li>
+            <li><a href="about.html">About Us</a></li>
+            <li><a href="pricing.html" class="active">Pricing</a></li>
+            <li><a href="b2b.html">For Schools</a></li>
+        </ul>
+        <div class="nav-actions">
+            <a href="login.html" class="btn btn-secondary">Login</a>
+            <a href="b2b.html" class="btn btn-primary">Sign Up</a>
+        </div>
+    </nav>
+
+    <section class="pricing-hero">
+        <div class="pricing-header">
+            <h1>Simple, <span class="text-gradient-cyan">Transparent Pricing</span></h1>
+            <p>Choose the perfect plan to unlock your brain's full potential. Cancel anytime.</p>
+        </div>
+
+        <div class="calculator-container glass-card" style="max-width: 800px; width: 100%; margin: 0 auto; padding: 40px; text-align: left; position: relative; z-index: 1;">
+            <h2 style="margin-bottom: 30px; text-align: center;">Estimate Your Custom B2B Plan</h2>
+            
+            <div style="display: flex; flex-direction: column; gap: 25px;">
+                <div class="calc-group">
+                    <label for="studentCount" style="display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: 600;">
+                        Number of Students <span id="studentVal" class="text-gradient">100</span>
+                    </label>
+                    <input type="range" id="studentCount" min="50" max="5000" step="50" value="100" style="width: 100%; accent-color: var(--primary-color); cursor: pointer;">
+                </div>
+                
+                <div class="calc-group">
+                    <label for="teacherCount" style="display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: 600;">
+                        Number of Teachers <span id="teacherVal" class="text-gradient-cyan">10</span>
+                    </label>
+                    <input type="range" id="teacherCount" min="1" max="200" step="1" value="10" style="width: 100%; accent-color: var(--accent-cyan); cursor: pointer;">
+                </div>
+                
+                <div class="calc-group">
+                    <label style="font-weight: 600; display: block; margin-bottom: 15px;">Custom Features & Add-ons</label>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s;">
+                            <input type="checkbox" id="featureAdmin" class="calc-feature" value="200" style="accent-color: var(--primary-color); width: 18px; height: 18px;">
+                            <span>Admin Portal <span style="color: var(--text-muted); font-size: 0.85rem;">(+$200/yr)</span></span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s;">
+                            <input type="checkbox" id="featureCurriculum" class="calc-feature" value="500" style="accent-color: var(--primary-color); width: 18px; height: 18px;">
+                            <span>Custom Curriculum <span style="color: var(--text-muted); font-size: 0.85rem;">(+$500/yr)</span></span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s;">
+                            <input type="checkbox" id="featureManager" class="calc-feature" value="1000" style="accent-color: var(--primary-color); width: 18px; height: 18px;">
+                            <span>Dedicated Manager <span style="color: var(--text-muted); font-size: 0.85rem;">(+$1000/yr)</span></span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s;">
+                            <input type="checkbox" id="featureAnalytics" class="calc-feature" value="300" style="accent-color: var(--primary-color); width: 18px; height: 18px;">
+                            <span>Advanced Analytics <span style="color: var(--text-muted); font-size: 0.85rem;">(+$300/yr)</span></span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; padding-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); text-align: center;">
+                    <p style="color: var(--text-muted); margin-bottom: 5px;">Estimated Annual Cost</p>
+                    <div class="pricing-price" style="font-size: 4rem; margin-bottom: 25px;">$<span id="totalPrice">0</span><span style="font-size: 1.2rem; color: var(--text-muted); font-weight: normal;">/yr</span></div>
+                    <a href="b2b.html" class="btn btn-primary" style="padding: 15px 40px; font-size: 1.1rem; display: inline-block;">Request Formal Quote</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 Cognitive Island. All rights reserved.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

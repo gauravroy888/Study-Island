@@ -1,0 +1,12 @@
+{
+  "public": ".",
+  "rewrites": [
+    { "source": "/student/**", "destination": "/student/index.html" },
+    { "source": "/teacher/**", "destination": "/teacher/index.html" },
+    { "source": "/admin/**", "destination": "/admin/index.html" },
+    { "source": "student/**", "destination": "/student/index.html" },
+    { "source": "teacher/**", "destination": "/teacher/index.html" },
+    { "source": "admin/**", "destination": "/admin/index.html" }
+  ]
+}
+

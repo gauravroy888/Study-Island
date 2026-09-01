@@ -1,0 +1,149 @@
+.settings-header {
+  margin-bottom: 24px;
+}
+
+.settings-content-grid {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: 40px;
+  flex: 1;
+}
+
+.settings-section {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.settings-right-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.section-title {
+  font-size: 14px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0 0 20px 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.profile-edit-layout {
+  display: flex;
+  gap: 30px;
+}
+
+.profile-photo-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(255,255,255,0.1);
+}
+
+.avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.text-cyan {
+  color: var(--accent-cyan) !important;
+}
+
+.text-danger {
+  color: #EF4444 !important;
+}
+
+.text-sm {
+  font-size: 12px !important;
+}
+
+.profile-form-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.form-input {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #fff;
+  font-family: var(--font-main);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus {
+  border-color: var(--accent-cyan);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.mt-20 {
+  margin-top: 20px;
+}
+
+.account-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.action-btn-link {
+  padding: 8px 12px !important;
+  border: none !important;
+  justify-content: flex-start !important;
+  width: 100%;
+}
+.action-btn-link:hover {
+  background: rgba(255,255,255,0.05) !important;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .settings-content-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  
+  .profile-edit-layout {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .settings-header .tabs {
+    overflow-x: auto;
+    width: 100%;
+    padding-bottom: 8px;
+  }
+}

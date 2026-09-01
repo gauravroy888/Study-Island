@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;">
+    <title>Cognitive Island | Interactive Learning Adventure</title>
+    <meta name="description" content="Embark on an interactive learning adventure across science, math, history and more. Learn by doing, exploring, and discovering the world around you.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Inline style for hero background to utilize the local asset -->
+    <style>
+        .hero {
+            background-image: url('assets/images/hero_bg%20V2.jpg');
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Interactive Dot Background -->
+    <div class="dot-background"></div>
+
+    <!-- Navigation -->
+    <nav class="glass">
+        <div class="logo">
+            <span>🧠</span>
+            <span class="text-gradient">Cognitive Island</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="index.html#home" class="active">Home</a></li>
+            <li><a href="features.html">Features</a></li>
+            <li><a href="about.html">About Us</a></li>
+            <li><a href="pricing.html">Pricing</a></li>
+            <li><a href="b2b.html">For Schools</a></li>
+        </ul>
+        <div class="nav-actions">
+            <a href="login.html" class="btn btn-secondary">Login</a>
+            <a href="b2b.html" class="btn btn-primary">Sign Up</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero" id="home">
+        <div class="hero-content">
+            <span class="hero-subtitle">Explore. Learn. Evolve.</span>
+            <h1 class="hero-title">WELCOME TO <br><span class="text-gradient">COGNITIVE ISLAND</span></h1>
+            <p class="hero-desc">Embark on an interactive learning adventure across science, math, history and more. Learn by doing, exploring and discovering the world around you.</p>
+            <div class="hero-actions">
+                <button class="btn btn-primary">Try It Here →</button>
+                <button class="btn btn-secondary">Explore Island</button>
+            </div>
+        </div>
+
+        <!-- Floating Widget -->
+        <div class="discovery-widget glass-card">
+            <span class="widget-label">✦ EDTECH ISLAND</span>
+            <h3>WHAT WILL YOU<br><span class="text-gradient-cyan">DISCOVER TODAY?</span></h3>
+            
+            <div class="widget-stats">
+                <div class="stat-item">
+                    <h4>Science</h4>
+                    <p id="stat-science-count">2 Interactive Labs</p>
+                </div>
+                <div class="stat-item">
+                    <h4>Astronomy</h4>
+                    <p id="stat-astronomy-count">3D Solar System</p>
+                </div>
+                <div class="stat-item">
+                    <h4>Interactive 3D</h4>
+                    <p id="stat-interactive-count">Real-time Physics</p>
+                </div>
+            </div>
+            
+            <a href="login.html" class="btn btn-primary" style="width: 100%; margin-bottom: 10px; display: inline-block; text-align: center; box-sizing: border-box;">Start Journey →</a>
+            <a href="login.html" class="btn btn-secondary" style="width: 100%; display: inline-block; text-align: center; box-sizing: border-box;">Resume</a>
+        </div>
+    </header>
+
+    <script>
+      // Fix U1: Fetch dynamic counts from Supabase custom_courses
+      (function() {
+        var url = 'https://qmyrxvtbzlbnvzxypnus.supabase.co/rest/v1/custom_courses?select=id,category&is_published=eq.true';
+        var key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFteXJ4dnRiemxibnZ6eHlwbnVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA4OTcsImV4cCI6MjA5NTM5Njg5N30.ABvW_oBzXC2Ffxm5ToLh6t4WmdKPdtg9SyfeAE76iJo';
+        fetch(url, { headers: { 'apikey': key, 'Authorization': 'Bearer ' + key } })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (Array.isArray(data) && data.length > 0) {
+              var el = document.getElementById('stat-science-count');
+              if (el) el.textContent = data.length + ' Courses Published';
+            }
+          })
+          .catch(function(e) { /* use default text */ });
+      })();
+    </script>
+
+    <!-- Platform Features Section -->
+    <section id="features" class="showcase-section">
+        <div class="showcase-content" style="flex: 1 1 100%;">
+            <div class="section-header" style="text-align: left; margin-bottom: 2rem;">
+                <span class="section-subtitle">Core Capabilities</span>
+                <h2 class="section-title">PLATFORM <span class="text-gradient">FEATURES</span></h2>
+                <p class="showcase-desc">Discover the unique features that make our cognitive learning theory come to life through visual interaction, testing, and storytelling.</p>
+            </div>
+            
+            <div class="module-grid">
+                <div class="module-card glass-card">
+                    <span class="module-icon">🎮</span>
+                    <h4>Game World Navigation</h4>
+                    <p>High engagement for students through immersive exploration.</p>
+                </div>
+                <div class="module-card glass-card">
+                    <span class="module-icon">📖</span>
+                    <h4>Chapter Experiences</h4>
+                    <p>Interactive and structured learning modules.</p>
+                </div>
+                <div class="module-card glass-card">
+                    <span class="module-icon">🧪</span>
+                    <h4>Experiments Tab</h4>
+                    <p>Active learning through hands-on virtual experiments.</p>
+                </div>
+                <div class="module-card glass-card">
+                    <span class="module-icon">🥽</span>
+                    <h4>Mixed Reality Option</h4>
+                    <p>Unique differentiators bridging digital and physical worlds.</p>
+                </div>
+                <div class="module-card glass-card">
+                    <span class="module-icon">🧩</span>
+                    <h4>Story + Quiz Integration</h4>
+                    <p>Reinforces learning with compelling narratives and tests.</p>
+                </div>
+                <div class="module-card glass-card">
+                    <span class="module-icon">🏝️</span>
+                    <h4>Subject Islands</h4>
+                    <p>Memorable visual structure for organizing subjects.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Us Section Preview -->
+    <section id="about" class="showcase-section reverse">
+        <div class="showcase-content">
+            <h2 class="showcase-title">ABOUT <span class="text-gradient-cyan">US</span></h2>
+            <p class="showcase-desc">At Cognitive Island, we believe that learning improves when visual, interaction, testing, and storytelling are combined. Our mission is to revolutionize education by making it an unforgettable adventure.</p>
+            <a href="about.html" class="btn btn-primary" style="margin-top: 1.5rem; display: inline-block;">Read Our Full Story →</a>
+        </div>
+        <div class="showcase-image">
+            <img src="assets/images/hero_bg%20V2.jpg" alt="About Cognitive Island" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 Cognitive Island. All rights reserved.</p>
+    </footer>
+
+    <script type="module" src="./supabase-config.js?v=2"></script>
+    <script src="script.js"></script>
+</body>
+</html>

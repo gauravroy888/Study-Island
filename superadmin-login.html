@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognitive Island | Developer & SuperAdmin Gateway</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .login-page {
+            background-image: url('study-island/assets/Future verion lowres.jpg');
+            background-size: cover;
+            background-position: center;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-top: 80px;
+            padding-bottom: 40px;
+        }
+        
+        .login-page::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle at 50% 30%, rgba(0, 240, 255, 0.12), transparent 70%),
+                        rgba(3, 7, 18, 0.88);
+            z-index: 0;
+        }
+        
+        .dev-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid rgba(0, 240, 255, 0.35);
+            border-radius: 20px;
+            color: #00F0FF;
+            font-size: 0.78rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            box-shadow: 0 0 16px rgba(0, 240, 255, 0.2);
+        }
+        
+        .login-container {
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+            padding: 40px;
+            border-radius: 24px;
+            background: rgba(10, 15, 29, 0.82);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(0, 240, 255, 0.05);
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .login-header h2 {
+            font-size: 1.7rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.02em;
+            margin: 0;
+        }
+
+        .security-notice {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 10px 14px;
+            color: #F87171;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #94A3B8;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            border-radius: 12px;
+            color: #ffffff;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .form-control:focus {
+            border-color: #00F0FF;
+            box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        .submit-btn {
+            width: 100%;
+            margin-top: 20px;
+            padding: 14px;
+            border-radius: 12px;
+            border: none;
+            background: linear-gradient(135deg, #00F0FF, #3B82F6);
+            color: #050B14;
+            font-weight: 800;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 24px rgba(0, 240, 255, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 32px rgba(0, 240, 255, 0.6);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .google-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #FFFFFF;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .google-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 24px;
+        }
+
+        .back-link a {
+            color: #94A3B8;
+            font-size: 0.85rem;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .back-link a:hover {
+            color: #00F0FF;
+        }
+    </style>
+</head>
+<body>
+    <!-- Interactive Dot Background -->
+    <div class="dot-background"></div>
+
+    <!-- Navigation -->
+    <nav class="glass">
+        <div class="logo">
+            <span>🧠</span>
+            <a href="index.html" class="text-gradient">Cognitive Island</a>
+        </div>
+        <div class="nav-actions">
+            <a href="login.html" class="btn btn-secondary">Public Portals</a>
+        </div>
+    </nav>
+
+    <div class="login-page">
+        <div class="login-container">
+            <div class="login-header">
+                <div class="dev-badge">
+                    <span>👑 DEVELOPER GATEWAY</span>
+                </div>
+                <h2>SuperAdmin Console</h2>
+                <p style="color: #94A3B8; font-size: 0.88rem; margin-top: 6px;">Developer & System Master Control Access</p>
+            </div>
+
+            <div class="security-notice">
+                <span>🔒 Restricted Access — Developer Team Only</span>
+            </div>
+
+            <form id="superadminDevForm">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label>Root SuperAdmin Email / Access Key</label>
+                    <input type="text" id="superadmin-id" class="form-control" placeholder="urvashinath0409@gmail.com" value="urvashinath0409@gmail.com" required>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label>Master Password / Access Key</label>
+                    <input type="password" id="superadmin-pwd" class="form-control" placeholder="••••••••" required autofocus>
+                </div>
+
+                <button type="submit" id="submitBtn" class="submit-btn">
+                    <span>⚡ Authenticate & Launch Console</span>
+                </button>
+            </form>
+
+            <div style="margin-top: 24px; margin-bottom: 18px;">
+                <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                    <hr style="flex: 1; border: none; border-top: 1px solid rgba(255,255,255,0.12);">
+                    <span style="color: #64748B; font-size: 0.8rem; margin: 0 12px; font-weight: 700;">OR</span>
+                    <hr style="flex: 1; border: none; border-top: 1px solid rgba(255,255,255,0.12);">
+                </div>
+                <button type="button" class="google-btn" onclick="window.handleGoogleLogin()">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width: 20px;">
+                    <span>Continue with Google Dev Auth</span>
+                </button>
+            </div>
+
+            <div class="back-link">
+                <a href="login.html">← Return to Public Student / Teacher / Admin Login</a>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { signInWithGoogle, supabase } from './supabase-config.js?v=2';
+        window.handleGoogleLogin = signInWithGoogle;
+        window.supabase = supabase;
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set portal context specifically for superadmin
+            localStorage.setItem('selectedPortal', 'superadmin');
+
+            const form = document.getElementById('superadminDevForm');
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const loginId = document.getElementById('superadmin-id').value.trim();
+                const pwd = document.getElementById('superadmin-pwd').value;
+
+                if (!window.supabase) {
+                    alert("Database client not initialized. Please try again.");
+                    return;
+                }
+
+                const btn = document.getElementById('submitBtn');
+                const origText = btn.innerHTML;
+                btn.innerHTML = "<span>⚡ Authenticating Master Access...</span>";
+                btn.disabled = true;
+
+                try {
+                    let authEmail = loginId;
+                    if (!loginId.includes('@')) {
+                        const sanitized = loginId.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                        authEmail = `${sanitized}@cognitiveisland.edu`;
+                    }
+
+                    // Authenticate securely via Supabase Auth
+                    const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+                        email: authEmail,
+                        password: pwd
+                    });
+
+                    if (authError || !authData?.user) {
+                        alert("Access Denied: Invalid SuperAdmin Email or Master Access Key.");
+                        btn.innerHTML = origText;
+                        btn.disabled = false;
+                        return;
+                    }
+
+                    // Fetch profile details
+                    const { data: profile } = await window.supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('auth_id', authData.user.id)
+                        .single();
+
+                    const profileName = profile?.name || 'SuperAdministrator';
+                    const profileAvatar = profile?.avatar_url || null;
+
+                    const edtechUser = {
+                        uid: authData.user.id,
+                        email: authData.user.email,
+                        name: profileName,
+                        role: 'super_admin',
+                        avatar_url: profileAvatar
+                    };
+
+                    localStorage.setItem('edtech_user', JSON.stringify(edtechUser));
+                    localStorage.setItem('portal_name', profileName);
+                    if (profileAvatar) localStorage.setItem('portal_avatar', profileAvatar);
+                    localStorage.setItem('portal_designation', 'Super Administrator');
+
+                    const pathSegments = window.location.pathname.split('/').filter(Boolean);
+                    const repoPrefix = (window.location.hostname.endsWith('github.io') && pathSegments.length > 0)
+                        ? '/' + pathSegments[0]
+                        : '';
+
+                    // Redirect directly to SuperAdmin Portal
+                    window.location.href = window.location.origin + repoPrefix + '/superadmin/';
+
+                } catch (err) {
+                    alert("An error occurred during authentication.");
+                    console.error(err);
+                    btn.innerHTML = origText;
+                    btn.disabled = false;
+                }
+            });
+
+            // Interactive Dot Background Mouse Tracking
+            document.addEventListener('mousemove', (e) => {
+                document.documentElement.style.setProperty('--mouse-x', `${e.clientX}px`);
+                document.documentElement.style.setProperty('--mouse-y', `${e.clientY}px`);
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "edtech-island-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "build:admin": "npm run build --prefix portals/admin",
+    "build:student": "npm run build --prefix portals/student",
+    "build:teacher": "npm run build --prefix portals/teacher",
+    "build:superadmin": "npm run build --prefix portals/superadmin",
+    "build:study-island": "npm run build --prefix study-island",
+    "build:all": "npm run build:admin && npm run build:student && npm run build:teacher && npm run build:superadmin && npm run build:study-island"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1110.0",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "dotenv": "^17.4.2"
+  }
+}

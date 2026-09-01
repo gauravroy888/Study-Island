@@ -1,0 +1,543 @@
+/* ============================================================
+   AI Tutor Widget — Modern Glassmorphic Chat Drawer & Floating Bot
+   EdTech Island / Study Island / Universal HTML
+   ============================================================ */
+
+/* ── Isolated Scope Reset ───────────────────────────────── */
+.ai-tutor-widget,
+.ai-tutor-widget *,
+.ai-drawer,
+.ai-drawer * {
+  box-sizing: border-box !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+/* ── Force clickability on the whole bot stack ── */
+.ai-tutor-widget {
+  pointer-events: auto !important;
+  isolation: isolate !important;
+}
+.ai-drawer {
+  pointer-events: auto !important;
+  isolation: isolate !important;
+}
+/* Every interactive element must be explicitly clickable */
+.ai-drawer button,
+.ai-drawer textarea,
+.ai-drawer input,
+.ai-drawer .ai-drawer__chip,
+.ai-drawer .ai-drawer__icon-btn,
+.ai-drawer .ai-drawer__mic-btn,
+.ai-drawer .ai-drawer__send-btn {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* ── Floating Widget Button ─────────────────────────────── */
+.ai-tutor-widget {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  width: 110px !important;
+  height: 130px !important;
+  cursor: pointer !important;
+  z-index: 100001 !important;
+  user-select: none !important;
+  pointer-events: auto !important;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+.ai-tutor-widget:hover {
+  transform: scale(1.08) translateY(-2px) !important;
+}
+.ai-tutor-widget.open {
+  transform: scale(0.94) !important;
+}
+
+.bot-svg {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  pointer-events: none !important;
+  filter: drop-shadow(0 6px 22px rgba(148, 121, 255, 0.65)) !important;
+  transition: filter 0.3s ease !important;
+}
+.ai-tutor-widget:hover .bot-svg {
+  filter: drop-shadow(0 10px 36px rgba(148, 121, 255, 0.95)) !important;
+}
+
+/* State dot */
+.state-dot {
+  position: absolute !important;
+  bottom: 28px !important;
+  right: 14px !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+  border: 2px solid rgba(6, 10, 20, 0.95) !important;
+  pointer-events: none !important;
+  transition: background-color 0.3s !important;
+}
+.state-dot--idle      { background: #10B981 !important; box-shadow: 0 0 8px rgba(16, 185, 129, 0.7); }
+.state-dot--listening { background: #3B82F6 !important; animation: sdot 1s infinite !important; box-shadow: 0 0 10px rgba(59, 130, 246, 0.8); }
+.state-dot--thinking  { background: #F59E0B !important; animation: sdot 0.8s infinite !important; box-shadow: 0 0 10px rgba(245, 158, 11, 0.8); }
+.state-dot--speaking  { background: #A855F7 !important; animation: sdot 0.6s infinite !important; box-shadow: 0 0 10px rgba(168, 85, 247, 0.8); }
+.state-dot--error     { background: #EF4444 !important; }
+@keyframes sdot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.75); }
+}
+
+/* Tooltip */
+.widget-tooltip {
+  position: absolute !important;
+  bottom: calc(100% + 10px) !important;
+  right: 0 !important;
+  background: rgba(8, 14, 28, 0.97) !important;
+  border: 1px solid rgba(148, 121, 255, 0.45) !important;
+  color: #e2e8f0 !important;
+  font-size: 0.76rem !important;
+  font-weight: 700 !important;
+  padding: 6px 14px !important;
+  border-radius: 12px !important;
+  white-space: nowrap !important;
+  opacity: 0 !important;
+  transform: translateY(6px) !important;
+  transition: opacity 0.2s, transform 0.2s !important;
+  pointer-events: none !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45) !important;
+  letter-spacing: 0.2px !important;
+}
+.ai-tutor-widget:hover .widget-tooltip {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+/* ── Chat Drawer ─────────────────────────────────────────── */
+.ai-drawer {
+  position: fixed !important;
+  bottom: 168px !important;
+  right: 24px !important;
+  width: 375px !important;
+  max-height: 70vh !important;
+  background: rgba(10, 15, 30, 0.96) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border: 1px solid rgba(148, 121, 255, 0.32) !important;
+  border-radius: 24px !important;
+  z-index: 100000 !important;
+  pointer-events: auto !important;
+  display: none; /* hidden by default — JS adds .ai-drawer--open to show */
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.65),
+    0 0 30px rgba(148, 121, 255, 0.12),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1) !important;
+}
+/* Show only when open */
+.ai-drawer--open {
+  display: flex !important;
+  animation: drawerIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+@keyframes drawerIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)     scale(1); }
+}
+
+/* Header */
+.ai-drawer__header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 14px 18px !important;
+  background: linear-gradient(180deg, rgba(148, 121, 255, 0.12), rgba(148, 121, 255, 0.02)) !important;
+  border-bottom: 1px solid rgba(148, 121, 255, 0.16) !important;
+  flex-shrink: 0 !important;
+}
+.ai-drawer__title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.ai-drawer__sdot {
+  width: 9px !important;
+  height: 9px !important;
+  border-radius: 50% !important;
+  flex-shrink: 0 !important;
+  background: #10B981 !important;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.8) !important;
+}
+.ai-drawer__name {
+  font-size: 0.92rem !important;
+  font-weight: 800 !important;
+  color: #fff !important;
+  letter-spacing: 0.2px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+.ai-drawer__sub {
+  font-size: 0.74rem !important;
+  color: #94a3b8 !important;
+  margin-top: 2px !important;
+  max-width: 220px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.ai-drawer__hdr-actions {
+  display: flex !important;
+  gap: 4px !important;
+}
+.ai-drawer__icon-btn {
+  background: transparent !important;
+  border: none !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  padding: 6px !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: color 0.2s, background 0.2s !important;
+}
+.ai-drawer__icon-btn:hover {
+  color: #f8fafc !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Messages Area */
+.ai-drawer__msgs {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(148, 121, 255, 0.3) transparent !important;
+}
+.ai-drawer__msgs::-webkit-scrollbar { width: 4px; }
+.ai-drawer__msgs::-webkit-scrollbar-thumb { background: rgba(148, 121, 255, 0.3); border-radius: 4px; }
+
+/* Empty State */
+.ai-drawer__empty {
+  text-align: center !important;
+  color: #94a3b8 !important;
+  padding: 24px 12px !important;
+  font-size: 0.88rem !important;
+  line-height: 1.6 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+.ai-drawer__empty-icon {
+  font-size: 2.8rem !important;
+  margin-bottom: 4px !important;
+}
+.ai-drawer__empty p {
+  margin: 0 !important;
+  color: #cbd5e1 !important;
+}
+
+/* Message Rows */
+.ai-drawer__msg {
+  display: flex !important;
+  align-items: flex-end !important;
+  gap: 8px !important;
+  animation: msgIn 0.22s ease !important;
+}
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ai-drawer__msg--user {
+  flex-direction: row-reverse !important;
+}
+.ai-drawer__avatar {
+  font-size: 1.15rem !important;
+  flex-shrink: 0 !important;
+  margin-bottom: 2px !important;
+}
+
+/* Bubbles */
+.ai-drawer__bubble {
+  max-width: 82% !important;
+  padding: 10px 14px !important;
+  border-radius: 18px !important;
+  font-size: 0.88rem !important;
+  line-height: 1.6 !important;
+  position: relative !important;
+  word-wrap: break-word !important;
+  white-space: pre-wrap !important;
+}
+.ai-drawer__msg--user .ai-drawer__bubble {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5) !important;
+  color: #ffffff !important;
+  border-bottom-right-radius: 4px !important;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35) !important;
+}
+.ai-drawer__msg--model .ai-drawer__bubble {
+  background: rgba(148, 121, 255, 0.08) !important;
+  border: 1px solid rgba(148, 121, 255, 0.22) !important;
+  color: #e2e8f0 !important;
+  border-bottom-left-radius: 4px !important;
+}
+.ai-drawer__bubble.streaming::after {
+  content: '▋' !important;
+  display: inline-block !important;
+  color: #a78bfa !important;
+  animation: blink-cur 0.65s step-end infinite !important;
+  margin-left: 2px !important;
+}
+@keyframes blink-cur {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+/* Replay button */
+.ai-drawer__replay {
+  position: absolute !important;
+  bottom: -22px !important;
+  right: 4px !important;
+  background: transparent !important;
+  border: none !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  padding: 2px 6px !important;
+  border-radius: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  font-size: 0.70rem !important;
+  opacity: 0 !important;
+  transition: opacity 0.2s !important;
+}
+.ai-drawer__msg--model:hover .ai-drawer__replay {
+  opacity: 1 !important;
+}
+
+/* Thinking animation */
+.ai-drawer__bubble--thinking {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 12px 16px !important;
+}
+.thinking-dot {
+  width: 7px !important;
+  height: 7px !important;
+  border-radius: 50% !important;
+  background: #a78bfa !important;
+  animation: tdot 1.2s ease-in-out infinite !important;
+}
+.thinking-dot:nth-child(2) { animation-delay: 0.2s !important; }
+.thinking-dot:nth-child(3) { animation-delay: 0.4s !important; }
+@keyframes tdot {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50%      { opacity: 1;    transform: translateY(-5px); }
+}
+
+/* Hint Chips */
+.ai-drawer__hints {
+  display: flex !important;
+  gap: 8px !important;
+  padding: 10px 14px !important;
+  overflow-x: auto !important;
+  flex-shrink: 0 !important;
+  scrollbar-width: none !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+.ai-drawer__hints::-webkit-scrollbar { display: none !important; }
+.ai-drawer__chip {
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
+  flex-shrink: 0 !important;
+  background: rgba(148, 121, 255, 0.09) !important;
+  border: 1px solid rgba(148, 121, 255, 0.22) !important;
+  color: #c4b5fd !important;
+  font-size: 0.74rem !important;
+  font-weight: 700 !important;
+  padding: 0 12px !important;
+  border-radius: 9999px !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s !important;
+}
+.ai-drawer__chip:hover {
+  background: rgba(148, 121, 255, 0.22) !important;
+  border-color: rgba(0, 240, 255, 0.55) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Input Area */
+.ai-drawer__input-area {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 12px 14px !important;
+  background: rgba(6, 10, 20, 0.8) !important;
+  border-top: 1px solid rgba(148, 121, 255, 0.15) !important;
+  flex-shrink: 0 !important;
+}
+.ai-drawer__input {
+  flex: 1 !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(148, 121, 255, 0.25) !important;
+  border-radius: 12px !important;
+  color: #f8fafc !important;
+  font-size: 0.88rem !important;
+  padding: 10px 14px !important;
+  resize: none !important;
+  outline: none !important;
+  line-height: 1.4 !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+  scrollbar-width: none !important;
+}
+.ai-drawer__input::-webkit-scrollbar { display: none !important; }
+.ai-drawer__input:focus {
+  border-color: #00f0ff !important;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.25) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.ai-drawer__input::placeholder {
+  color: #475569 !important;
+}
+
+/* Action Icon Buttons (Watch / Mic) */
+.ai-drawer__mic-btn {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
+  max-width: 42px !important;
+  max-height: 42px !important;
+  background: rgba(148, 121, 255, 0.1) !important;
+  border: 1px solid rgba(148, 121, 255, 0.25) !important;
+  color: #c4b5fd !important;
+  border-radius: 12px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s !important;
+  flex-shrink: 0 !important;
+}
+.ai-drawer__mic-btn:hover {
+  background: rgba(148, 121, 255, 0.22) !important;
+  color: #ffffff !important;
+}
+.ai-drawer__mic-btn.active-voice,
+.ai-drawer__mic-btn.listening {
+  background: rgba(239, 68, 68, 0.22) !important;
+  border-color: rgba(239, 68, 68, 0.65) !important;
+  color: #ef4444 !important;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.45) !important;
+  animation: redMicPulse 1.5s ease-in-out infinite !important;
+}
+@keyframes redMicPulse {
+  0%, 100% { box-shadow: 0 0 0 0   rgba(239, 68, 68, 0.45); }
+  50%      { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+}
+
+.ai-drawer__icon-btn.muted {
+  color: #f59e0b !important;
+  background: rgba(245, 158, 11, 0.14) !important;
+}
+
+/* Voice Footer & Synced Waveform */
+.ai-drawer__voice-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  padding: 8px 14px 10px !important;
+  font-size: 0.74rem !important;
+  color: #94a3b8 !important;
+  border-top: 1px solid rgba(148, 121, 255, 0.12) !important;
+  background: rgba(6, 10, 20, 0.9) !important;
+}
+.ai-drawer__waveform {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  height: 18px !important;
+}
+.ai-drawer__wave-bar {
+  width: 3px !important;
+  height: 4px !important;
+  min-height: 3px !important;
+  max-height: 18px !important;
+  background: #ef4444 !important;
+  border-radius: 2px !important;
+  transition: height 0.05s ease-out, background-color 0.2s !important;
+}
+.ai-drawer__wave-bar.speaking {
+  background: #9479ff !important;
+}
+.ai-drawer__voice-label {
+  font-size: 0.74rem !important;
+  color: #94a3b8 !important;
+}
+
+/* Send Button */
+.ai-drawer__send-btn {
+  width: 44px !important;
+  height: 42px !important;
+  min-width: 44px !important;
+  min-height: 42px !important;
+  max-width: 44px !important;
+  max-height: 42px !important;
+  background: linear-gradient(135deg, #7c3aed, #0070f3) !important;
+  border: none !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s !important;
+  flex-shrink: 0 !important;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.45) !important;
+}
+.ai-drawer__send-btn:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px rgba(0, 240, 255, 0.5) !important;
+}
+.ai-drawer__send-btn:disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ── Mobile ──────────────────────────────────────────────── */
+@media (max-width: 500px) {
+  .ai-drawer {
+    right: 8px !important;
+    left: 8px !important;
+    width: auto !important;
+    bottom: 168px !important;
+    max-height: 74vh !important;
+  }
+  .ai-tutor-widget {
+    bottom: 16px !important;
+    right: 16px !important;
+    width: 96px !important;
+    height: 114px !important;
+  }
+}

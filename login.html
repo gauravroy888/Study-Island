@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;">
+    <title>EdTech Island | Portal Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .login-page {
+            background-image: url('study-island/assets/Future verion lowres.jpg');
+            background-size: cover;
+            background-position: center;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-top: 80px;
+        }
+        
+        .login-page::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(3, 7, 18, 0.7);
+            z-index: 0;
+        }
+        
+        .login-container {
+            width: 100%;
+            max-width: 450px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+            padding: 40px;
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .login-tabs {
+            display: flex;
+            background: rgba(0,0,0,0.5);
+            border-radius: 30px;
+            padding: 5px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .login-tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px 0;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        
+        .login-tab.active {
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            color: #000;
+            box-shadow: var(--glow-primary);
+        }
+        
+        .login-form-container {
+            display: none;
+        }
+        
+        .login-form-container.active {
+            display: block;
+            animation: fadeIn 0.4s ease forwards;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .login-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Interactive Dot Background -->
+    <div class="dot-background"></div>
+
+    <!-- Navigation -->
+    <nav class="glass">
+        <div class="logo">
+            <span>🧠</span>
+            <a href="index.html" class="text-gradient">Cognitive Island</a>
+        </div>
+        <div class="nav-actions">
+            <a href="b2b.html" class="btn btn-primary">Sign Up</a>
+        </div>
+    </nav>
+
+    <div class="login-page">
+        <div class="login-container glass-card" style="max-width: 480px;">
+            <div class="login-header">
+                <h2>Portal Login</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 5px;">Select your portal to continue</p>
+            </div>
+            
+            <div class="login-tabs" style="gap: 4px;">
+                <div class="login-tab active" data-tab="student">Student</div>
+                <div class="login-tab" data-tab="teacher">Teacher</div>
+                <div class="login-tab" data-tab="admin">Admin</div>
+            </div>
+            
+            <!-- Student Login -->
+            <div class="login-form-container active" id="form-student">
+                <form>
+                    <div class="form-group">
+                        <label>Student ID / Email</label>
+                        <input type="text" id="student-id" class="form-control" placeholder="Enter your Login ID or Email" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="student-pwd" class="form-control" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 15px;">Login as Student</button>
+                </form>
+            </div>
+            
+            <!-- Teacher Login -->
+            <div class="login-form-container" id="form-teacher">
+                <form>
+                    <div class="form-group">
+                        <label>Educator Email / Login ID</label>
+                        <input type="text" id="teacher-id" class="form-control" placeholder="teacher@school.edu" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="teacher-pwd" class="form-control" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 15px; background: linear-gradient(90deg, #ff7e5f, #feb47b); box-shadow: 0 0 20px rgba(255,126,95,0.4); color: #fff;">Login as Teacher</button>
+                </form>
+            </div>
+            
+            <!-- Admin Login -->
+            <div class="login-form-container" id="form-admin">
+                <form>
+                    <div class="form-group">
+                        <label>Administrator Email / Login ID</label>
+                        <input type="text" id="admin-id" class="form-control" placeholder="admin@district.edu" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="admin-pwd" class="form-control" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 15px; background: linear-gradient(90deg, #b05cff, #f96dff); box-shadow: 0 0 20px rgba(176,92,255,0.4); color: #fff;">Login as Admin</button>
+                </form>
+            </div>
+            
+            <div style="margin-top: 30px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+                    <hr style="flex: 1; border: none; border-top: 1px solid rgba(255,255,255,0.2);">
+                    <span style="color: var(--text-muted); font-size: 0.9rem; margin: 0 10px;">OR</span>
+                    <hr style="flex: 1; border: none; border-top: 1px solid rgba(255,255,255,0.2);">
+                </div>
+                <button type="button" class="btn btn-primary" onclick="window.handleGoogleLogin()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 1.1rem; padding: 15px; background: #fff; color: #333; border: 1px solid #ddd; border-radius: 8px;">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width: 24px;">
+                    Continue with Google
+                </button>
+            </div>
+            
+            <div class="login-footer" style="display: flex; flex-direction: column; gap: 8px; align-items: center;">
+                <a href="#" style="color: var(--primary-color);">Forgot Password?</a>
+                <a href="superadmin-login.html" style="color: var(--text-muted); font-size: 0.8rem; text-decoration: none; opacity: 0.6; transition: all 0.2s ease;">Developer Gateway 🔐</a>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { signInWithGoogle, supabase } from './supabase-config.js?v=2';
+        window.handleGoogleLogin = signInWithGoogle;
+        window.supabase = supabase;
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabs = document.querySelectorAll('.login-tab');
+            const forms = document.querySelectorAll('.login-form-container');
+            
+            // Get saved portal or default to student
+            let savedPortal = localStorage.getItem('selectedPortal') || 'student';
+            localStorage.setItem('selectedPortal', savedPortal);
+
+            // Sync UI to saved portal on load
+            tabs.forEach(t => t.classList.remove('active'));
+            forms.forEach(f => f.classList.remove('active'));
+            
+            const activeTabElement = document.querySelector(`.login-tab[data-tab="${savedPortal}"]`);
+            if (activeTabElement) activeTabElement.classList.add('active');
+            
+            const activeFormElement = document.getElementById('form-' + savedPortal);
+            if (activeFormElement) activeFormElement.classList.add('active');
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remove active from all
+                    tabs.forEach(t => t.classList.remove('active'));
+                    forms.forEach(f => f.classList.remove('active'));
+                    
+                    // Add active to clicked
+                    tab.classList.add('active');
+                    const targetTab = tab.getAttribute('data-tab');
+                    const targetId = 'form-' + targetTab;
+                    document.getElementById(targetId).classList.add('active');
+                    
+                    // Store selected portal for Google Login check
+                    localStorage.setItem('selectedPortal', targetTab);
+                });
+            });
+
+            // Handle Manual Form Submissions — Now using SECURE Supabase Auth
+            const allForms = document.querySelectorAll('form');
+            allForms.forEach(form => {
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    
+                    const role = localStorage.getItem('selectedPortal') || 'student';
+                    let loginId = '';
+                    let pwd = '';
+                    
+                    if (role === 'student') {
+                        loginId = document.getElementById('student-id').value.trim();
+                        pwd = document.getElementById('student-pwd').value;
+                    } else if (role === 'teacher') {
+                        loginId = document.getElementById('teacher-id').value.trim();
+                        pwd = document.getElementById('teacher-pwd').value;
+                    } else if (role === 'admin') {
+                        loginId = document.getElementById('admin-id').value.trim();
+                        pwd = document.getElementById('admin-pwd').value;
+                    } else if (role === 'superadmin' || role === 'super_admin') {
+                        loginId = document.getElementById('superadmin-id').value.trim();
+                        pwd = document.getElementById('superadmin-pwd').value;
+                    }
+                    
+                    if (!window.supabase) {
+                        alert("Database client not loaded yet. Please try again.");
+                        return;
+                    }
+                    
+                    const btn = form.querySelector('button[type="submit"]');
+                    const origText = btn.innerText;
+                    btn.innerText = "Verifying...";
+                    btn.disabled = true;
+                    
+                    try {
+                        // If it looks like a real email use it directly,
+                        // otherwise build the deterministic @cognitiveisland.edu address
+                        let authEmail = loginId;
+                        if (!loginId.includes('@')) {
+                            const sanitized = loginId.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                            authEmail = `${sanitized}@cognitiveisland.edu`;
+                        }
+
+                        // SECURE: Use Supabase Auth — password is hashed, never plain text
+                        const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+                            email: authEmail,
+                            password: pwd
+                        });
+
+                        if (authError || !authData?.user) {
+                            alert("Invalid ID or Password.");
+                            btn.innerText = origText;
+                            btn.disabled = false;
+                            return;
+                        }
+
+                        // Fetch the full profile to confirm role and get display data
+                        const { data: profile } = await window.supabase
+                            .from('profiles')
+                            .select('*')
+                            .eq('auth_id', authData.user.id)
+                            .single();
+
+                        // Role is determined from DB profiles table only.
+                        // Do NOT override role based on email — set role in Supabase profiles table instead.
+                        let profileRole = profile?.role || 'student';
+                        const profileName = profile?.name || loginId;
+                        const profileAvatar = profile?.avatar_url || null;
+
+                        const edtechUser = {
+                            uid: authData.user.id,
+                            email: authData.user.email,
+                            name: profileName,
+                            role: profileRole,
+                            avatar_url: profileAvatar
+                        };
+
+                        localStorage.setItem('edtech_user', JSON.stringify(edtechUser));
+                        localStorage.setItem('portal_name', profileName);
+                        if (profileAvatar) localStorage.setItem('portal_avatar', profileAvatar);
+
+                        let designation = 'Student';
+                        if (profileRole === 'admin') designation = 'Administrator';
+                        else if (profileRole === 'teacher') designation = 'Teacher';
+                        else if (profileRole === 'super_admin' || profileRole === 'superadmin') designation = 'Super Administrator';
+                        localStorage.setItem('portal_designation', designation);
+
+                        const pathSegments = window.location.pathname.split('/').filter(Boolean);
+                        const repoPrefix = (window.location.hostname.endsWith('github.io') && pathSegments.length > 0)
+                            ? '/' + pathSegments[0]
+                            : '';
+                        let targetPortal = '/student/';
+                        if (profileRole === 'admin') targetPortal = '/admin/';
+                        else if (profileRole === 'teacher') targetPortal = '/teacher/';
+                        else if (profileRole === 'super_admin' || profileRole === 'superadmin') targetPortal = '/superadmin/';
+
+                        window.location.href = window.location.origin + repoPrefix + targetPortal;
+
+                    } catch (err) {
+                        alert("An error occurred during login.");
+                        console.error(err);
+                        btn.innerText = origText;
+                        btn.disabled = false;
+                    }
+                });
+            });
+
+            // Interactive Dot Background Mouse Tracking
+            document.addEventListener('mousemove', (e) => {
+                document.documentElement.style.setProperty('--mouse-x', `${e.clientX}px`);
+                document.documentElement.style.setProperty('--mouse-y', `${e.clientY}px`);
+            });
+        });
+    </script>
+</body>
+</html>

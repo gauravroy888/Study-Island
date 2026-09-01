@@ -1,0 +1,187 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --brand-primary: #00F0FF;
+  --brand-secondary: #3B82F6;
+  --brand-glow: rgba(0, 240, 255, 0.4);
+  --brand-border: rgba(0, 240, 255, 0.35);
+
+  --bg-dark: #050811;
+  --panel-bg: rgba(13, 19, 41, 0.65);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --text-primary: #FFFFFF;
+  --text-secondary: #94A3B8;
+  
+  --accent-cyan: var(--brand-primary);
+  --accent-blue: var(--brand-secondary);
+  --accent-purple: #8A2BE2;
+  --accent-gold: #FFD700;
+  
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --font-main: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  /* The background image will be set inline or via a specific class so we can dynamically load the generated artifact */
+}
+
+/* Custom Cyber-Glass Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(5, 8, 17, 0.4);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 229, 255, 0.25);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 229, 255, 0.1);
+  transition: all 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 229, 255, 0.55);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 229, 255, 0.3) rgba(5, 8, 17, 0.4);
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+p {
+  color: var(--text-secondary);
+}
+
+/* Utilities */
+.glass-panel {
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 16px;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.text-gradient {
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-family: var(--font-main);
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  outline: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-primary, #00F0FF), var(--brand-secondary, #3B82F6)) !important;
+  color: #000 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 0 15px var(--brand-glow, rgba(0, 240, 255, 0.35)) !important;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 25px var(--brand-glow, rgba(0, 240, 255, 0.6)) !important;
+  transform: translateY(-1px);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--panel-border);
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+/* App Layout */
+.app-container {
+  display: flex;
+  height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+/* Background image overlay */
+.bg-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-size: cover;
+  background-position: center top;
+  z-index: -1;
+}
+.bg-gradient {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(5, 8, 17, 0.2) 0%, var(--bg-dark) 100%);
+  z-index: -1;
+}
+
+/* Large Screen Optimization */
+@media (min-width: 1600px) {
+  .app-container {
+    max-width: 1920px;
+    margin: 0 auto;
+  }
+  html {
+    font-size: 18px;
+  }
+}
+
+/* Fix for dropdown menus on dark theme */
+select option {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
