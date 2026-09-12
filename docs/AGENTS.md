@@ -1,6 +1,6 @@
 # EdTech Island — Project Guidelines & Governance
 
-> **PRIMARY GOVERNANCE:** All agents must read and strictly obey [`EDTECH_ISLAND_AI_ENGINEERING_CONSTITUTION.md`](./EDTECH_ISLAND_AI_ENGINEERING_CONSTITUTION.md) and [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md).
+> **PRIMARY GOVERNANCE:** All agents must read and strictly obey [`EDTECH_ISLAND_AI_ENGINEERING_CONSTITUTION.md`](./EDTECH_ISLAND_AI_ENGINEERING_CONSTITUTION.md), [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md), and [`ANTI_GRAVITY_ENGINEERING_GUARDRAILS.md`](./ANTI_GRAVITY_ENGINEERING_GUARDRAILS.md).
 
 ## 🚫 Git Push Policy (STRICT & PERMANENT)
 - **NEVER** run `git push` or push changes to GitHub or any remote repository automatically.

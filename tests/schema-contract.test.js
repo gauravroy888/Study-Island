@@ -11,27 +11,59 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 describe('Live Schema Contract & Drift Prevention', () => {
 
   describe('Live Supabase REST Column Verifications', () => {
-    async function probeTableCols(table, cols) {
-      const q = cols.join(',');
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${q}&limit=1`, {
-        headers: { apikey: SUPABASE_ANON_KEY }
-      });
-      return { status: res.status, ok: res.ok, text: await res.text() };
+    function isNetworkError(e) {
+      if (!e) return false;
+      const msg = String(e.message || '');
+      const code = e.code || e.cause?.code;
+      return (
+        code === 'ENOTFOUND' ||
+        code === 'ECONNREFUSED' ||
+        code === 'ETIMEDOUT' ||
+        code === 'UND_ERR_CONNECT_TIMEOUT' ||
+        code === 'EAI_AGAIN' ||
+        msg.includes('fetch failed') ||
+        msg.includes('Failed to fetch') ||
+        msg.includes('ENOTFOUND') ||
+        msg.includes('ECONNREFUSED') ||
+        msg.includes('ETIMEDOUT') ||
+        msg.includes('network unreachable') ||
+        (e.cause?.name === 'AggregateError' && e.cause?.errors?.some?.(err => isNetworkError(err)))
+      );
     }
 
-    test('classes table has verified columns (id, name, subject, institution_id)', async () => {
-      const { status, ok } = await probeTableCols('classes', ['id', 'name', 'subject', 'institution_id']);
-      assert.strictEqual(ok, true, 'classes columns should return HTTP 200');
-      assert.strictEqual(status, 200);
+    async function probeTableCols(table, cols) {
+      const q = cols.join(',');
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${q}&limit=1`, {
+          headers: { apikey: SUPABASE_ANON_KEY }
+        });
+        return { status: res.status, ok: res.ok, text: await res.text() };
+      } catch (err) {
+        return { networkError: err };
+      }
+    }
+
+    test('classes table has verified columns (id, name, subject, institution_id)', async (t) => {
+      const res = await probeTableCols('classes', ['id', 'name', 'subject', 'institution_id']);
+      if (res.networkError) {
+        t.skip(`Blocked: Live Supabase network unreachable (${res.networkError.message})`);
+        return;
+      }
+      assert.strictEqual(res.ok, true, 'classes columns should return HTTP 200');
+      assert.strictEqual(res.status, 200);
     });
 
-    test('classes.department is confirmed NON-EXISTENT in live schema (returns 400)', async () => {
-      const { status, text } = await probeTableCols('classes', ['department']);
-      assert.strictEqual(status, 400, 'classes.department must be rejected by PostgREST');
-      assert.match(text, /column classes\.department does not exist/);
+    test('classes.department is confirmed NON-EXISTENT in live schema (returns 400)', async (t) => {
+      const res = await probeTableCols('classes', ['department']);
+      if (res.networkError) {
+        t.skip(`Blocked: Live Supabase network unreachable (${res.networkError.message})`);
+        return;
+      }
+      assert.strictEqual(res.status, 400, 'classes.department must be rejected by PostgREST');
+      assert.match(res.text, /column classes\.department does not exist/);
     });
 
-    test('course_chapters table has verified core & modality columns', async () => {
+    test('course_chapters table has verified core & modality columns', async (t) => {
       const verifiedCols = [
         'id', 'subject_id', 'title', 'chapter_slug', 'description', 'chapter_order',
         'is_published', 'icon_class', 'front_visuals_url', 'scene_3d_model_url',
@@ -40,63 +72,103 @@ describe('Live Schema Contract & Drift Prevention', () => {
         'stories_ready', 'custom_modalities', 'experiments_list', 'stories_list',
         'modality_urls', 'front_visuals_ready'
       ];
-      const { status, ok } = await probeTableCols('course_chapters', verifiedCols);
-      assert.strictEqual(ok, true, 'course_chapters columns should return HTTP 200');
-      assert.strictEqual(status, 200);
+      const res = await probeTableCols('course_chapters', verifiedCols);
+      if (res.networkError) {
+        t.skip(`Blocked: Live Supabase network unreachable (${res.networkError.message})`);
+        return;
+      }
+      assert.strictEqual(res.ok, true, 'course_chapters columns should return HTTP 200');
+      assert.strictEqual(res.status, 200);
     });
 
-    test('course_chapters.chapter_name is confirmed NON-EXISTENT in live schema (returns 400)', async () => {
-      const { status, text } = await probeTableCols('course_chapters', ['chapter_name']);
-      assert.strictEqual(status, 400, 'chapter_name must be rejected by PostgREST');
-      assert.match(text, /column course_chapters\.chapter_name does not exist/);
+    test('course_chapters.chapter_name is confirmed NON-EXISTENT in live schema (returns 400)', async (t) => {
+      const res = await probeTableCols('course_chapters', ['chapter_name']);
+      if (res.networkError) {
+        t.skip(`Blocked: Live Supabase network unreachable (${res.networkError.message})`);
+        return;
+      }
+      assert.strictEqual(res.status, 400, 'chapter_name must be rejected by PostgREST');
+      assert.match(res.text, /column course_chapters\.chapter_name does not exist/);
     });
 
-    test('course_chapters.class_name is confirmed NON-EXISTENT in live schema (returns 400)', async () => {
-      const { status, text } = await probeTableCols('course_chapters', ['class_name']);
-      assert.strictEqual(status, 400, 'class_name must be rejected by PostgREST');
-      assert.match(text, /column course_chapters\.class_name does not exist/);
+    test('course_chapters.class_name is confirmed NON-EXISTENT in live schema (returns 400)', async (t) => {
+      const res = await probeTableCols('course_chapters', ['class_name']);
+      if (res.networkError) {
+        t.skip(`Blocked: Live Supabase network unreachable (${res.networkError.message})`);
+        return;
+      }
+      assert.strictEqual(res.status, 400, 'class_name must be rejected by PostgREST');
+      assert.match(res.text, /column course_chapters\.class_name does not exist/);
     });
 
-    test('subjects table has verified columns (id, name, class_id, icon)', async () => {
-      const { status, ok } = await probeTableCols('subjects', ['id', 'name', 'class_id', 'icon']);
-      assert.strictEqual(ok, true, 'subjects columns should return HTTP 200');
-      assert.strictEqual(status, 200);
+    test('subjects table has verified columns (id, name, class_id, icon)', async (t) => {
+      const res = await probeTableCols('subjects', ['id', 'name', 'class_id', 'icon']);
+      if (res.networkError) {
+        t.skip(`Blocked: Live Supabase network unreachable (${res.networkError.message})`);
+        return;
+      }
+      assert.strictEqual(res.ok, true, 'subjects columns should return HTTP 200');
+      assert.strictEqual(res.status, 200);
     });
 
-    test('course_chapters -> subjects relationship join is supported by PostgREST', async () => {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/course_chapters?select=id,title,subject_id,subjects(id,name)&limit=1`, {
-        headers: { apikey: SUPABASE_ANON_KEY }
-      });
+    test('course_chapters -> subjects relationship join is supported by PostgREST', async (t) => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/course_chapters?select=id,title,subject_id,subjects(id,name)&limit=1`, {
+          headers: { apikey: SUPABASE_ANON_KEY }
+        });
+        assert.strictEqual(res.ok, true);
+        assert.strictEqual(res.status, 200);
+      } catch (err) {
+        if (isNetworkError(err)) {
+          t.skip(`Blocked: Live Supabase network unreachable (${err.message})`);
+          return;
+        }
+        throw err;
+      }
+    });
+
+    test('courses table has verified columns (id, title, class_name, subject, description, thumbnail_url, is_published)', async (t) => {
+      const res = await probeTableCols('courses', [
+        'id', 'title', 'class_name', 'subject', 'description', 'thumbnail_url', 'is_published'
+      ]);
+      if (res.networkError) {
+        t.skip(`Blocked: Live Supabase network unreachable (${res.networkError.message})`);
+        return;
+      }
       assert.strictEqual(res.ok, true);
       assert.strictEqual(res.status, 200);
     });
 
-    test('courses table has verified columns (id, title, class_name, subject, description, thumbnail_url, is_published)', async () => {
-      const { status, ok } = await probeTableCols('courses', [
-        'id', 'title', 'class_name', 'subject', 'description', 'thumbnail_url', 'is_published'
-      ]);
-      assert.strictEqual(ok, true);
-      assert.strictEqual(status, 200);
-    });
-
-    test('chapter_modalities table has verified columns', async () => {
-      const { status, ok } = await probeTableCols('chapter_modalities', [
+    test('chapter_modalities table has verified columns', async (t) => {
+      const res = await probeTableCols('chapter_modalities', [
         'id', 'chapter_id', 'modality_type', 'title', 'resource_url', 'content_status'
       ]);
-      assert.strictEqual(ok, true);
-      assert.strictEqual(status, 200);
+      if (res.networkError) {
+        t.skip(`Blocked: Live Supabase network unreachable (${res.networkError.message})`);
+        return;
+      }
+      assert.strictEqual(res.ok, true);
+      assert.strictEqual(res.status, 200);
     });
 
-    test('class_students table has verified relationship columns', async () => {
-      const { status, ok } = await probeTableCols('class_students', ['class_id', 'student_id']);
-      assert.strictEqual(ok, true);
-      assert.strictEqual(status, 200);
+    test('class_students table has verified relationship columns', async (t) => {
+      const res = await probeTableCols('class_students', ['class_id', 'student_id']);
+      if (res.networkError) {
+        t.skip(`Blocked: Live Supabase network unreachable (${res.networkError.message})`);
+        return;
+      }
+      assert.strictEqual(res.ok, true);
+      assert.strictEqual(res.status, 200);
     });
 
-    test('profiles table has verified tenant & identity columns (id, auth_id, role, department)', async () => {
-      const { status, ok } = await probeTableCols('profiles', ['id', 'auth_id', 'role', 'department']);
-      assert.strictEqual(ok, true);
-      assert.strictEqual(status, 200);
+    test('profiles table has verified tenant & identity columns (id, auth_id, role, department)', async (t) => {
+      const res = await probeTableCols('profiles', ['id', 'auth_id', 'role', 'department']);
+      if (res.networkError) {
+        t.skip(`Blocked: Live Supabase network unreachable (${res.networkError.message})`);
+        return;
+      }
+      assert.strictEqual(res.ok, true);
+      assert.strictEqual(res.status, 200);
     });
   });
 
