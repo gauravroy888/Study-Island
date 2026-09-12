@@ -4,7 +4,7 @@ const { SUPABASE_URL, SUPABASE_ANON_KEY, verifySupabaseJWT } = require('./auth')
 const { uploadRateLimiter, checkRateLimit } = require('./rateLimit');
 
 // SECURITY: R2 credentials come from environment variables ONLY.
-if (!process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || !process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY) {
+if (process.env.NODE_ENV !== 'test' && (!process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || !process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY)) {
   console.warn('⚠️  R2 credentials not found in environment — /api/upload-r2 will be unavailable.');
 }
 
@@ -304,7 +304,9 @@ async function handleR2Upload(req, res, url, options = {}) {
     }));
 
     const cdnUrl = `${R2_CONFIG.publicCdnUrl}/${key}`;
-    console.log(`☁️ [R2 Upload] user=${user.email} | ${key} (${fileBuffer.length} bytes) -> ${cdnUrl}`);
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`☁️ [R2 Upload] user=${user.email} | ${key} (${fileBuffer.length} bytes) -> ${cdnUrl}`);
+    }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -315,7 +317,9 @@ async function handleR2Upload(req, res, url, options = {}) {
       contentType: mime
     }));
   } catch (err) {
-    console.error('❌ R2 Upload Error:', err);
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('❌ R2 Upload Error:', err);
+    }
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: false, error: 'Upload failed. Please try again.' }));
   }

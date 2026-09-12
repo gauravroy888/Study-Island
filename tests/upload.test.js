@@ -1,12 +1,30 @@
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { Readable } from 'node:stream';
 import WebSocket from 'ws';
 
+process.env.NODE_ENV = 'test';
+
 if (!globalThis.WebSocket) {
   globalThis.WebSocket = WebSocket;
 }
+
+const originalLog = console.log;
+const originalWarn = console.warn;
+const originalError = console.error;
+
+before(() => {
+  console.log = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+});
+
+after(() => {
+  console.log = originalLog;
+  console.warn = originalWarn;
+  console.error = originalError;
+});
 
 const require = createRequire(import.meta.url);
 const {
