@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Card from '../components/Card';
 import { Bell, BookOpen, MessageSquare, Star, CheckCircle, UserPlus, Info } from 'lucide-react';
 import { supabase } from '../supabase';
@@ -7,14 +7,14 @@ import './Notifications.css';
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState('all'); // 'all' or 'unread'
-  const [currentUser, setCurrentUser] = useState(null);
-
-  useEffect(() => {
-    const userStr = localStorage.getItem('edtech_user');
-    if (userStr) {
-      try { setCurrentUser(JSON.parse(userStr)); } catch (e) {}
+  const [currentUser] = useState(() => {
+    try {
+      const userStr = localStorage.getItem('edtech_user');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch {
+      return null;
     }
-  }, []);
+  });
 
   const fetchNotifications = useCallback(async (user) => {
     if (!user) return;
@@ -41,17 +41,26 @@ export default function Notifications() {
   useEffect(() => {
     if (!currentUser) return;
 
-    fetchNotifications(currentUser);
+    let isMounted = true;
+    const load = async () => {
+      if (isMounted) await fetchNotifications(currentUser);
+    };
+    void load();
 
     const subscription = supabase.channel('admin:notifications:v2')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'notifications'
-      }, () => fetchNotifications(currentUser))
+      }, () => {
+        if (isMounted) void fetchNotifications(currentUser);
+      })
       .subscribe();
 
-    return () => { supabase.removeChannel(subscription); };
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(subscription);
+    };
   }, [currentUser, fetchNotifications]);
 
   const markAsRead = async (id) => {

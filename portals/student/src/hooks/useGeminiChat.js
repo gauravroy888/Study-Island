@@ -1,17 +1,28 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import {
-  buildSessionContext, trackTopic, incrementMessages,
+  trackTopic, incrementMessages,
   refreshSessionSummary
 } from "./useAriaSession";
 import { screenCapture } from "./useScreenCapture";
 
-const MODEL = "gemini-3.5-flash-lite";
-
-function getApiKey() {
-  return localStorage.getItem("aria_gemini_key")
-      || (typeof window !== "undefined" ? window.ARIA_GEMINI_KEY : "")
-      || (import.meta.env?.VITE_GEMINI_API_KEY || "")
-      || "";
+async function getSessionToken() {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
+          const item = JSON.parse(window.localStorage.getItem(k));
+          if (item?.access_token) return item.access_token;
+        }
+      }
+      const raw = window.localStorage.getItem("sb-qmyrxvtbzlbnvzxypnus-auth-token");
+      if (raw) {
+        const item = JSON.parse(raw);
+        if (item?.access_token) return item.access_token;
+      }
+    }
+  } catch { /* ignore parse error */ }
+  return "";
 }
 
 const MAX_HISTORY = 8;
@@ -28,7 +39,7 @@ function saveMessages(msgs) {
   try {
     const toSave = msgs.filter(m => !m.streaming && m.text).slice(-20);
     localStorage.setItem("aria_chat_history", JSON.stringify(toSave));
-  } catch {}
+  } catch { /* ignore localStorage error */ }
 }
 
 /* ── Deep, fast context extraction of exact active view & 3D island state ── */
@@ -104,7 +115,7 @@ function getDetailedScreenContext() {
             break;
           }
         }
-      } catch (e) {
+      } catch {
         if (iframe.title || iframe.src) {
           parts.push(`Embedded 3D Simulation: "${iframe.title || iframe.src}"`);
         }
@@ -118,18 +129,9 @@ function getDetailedScreenContext() {
     }
 
     return parts.join('\n');
-  } catch (e) {
+  } catch {
     return `Page: "${document.title}" (${window.location.pathname})`;
   }
-}
-
-/* ── Student info ── */
-function getStudentInfo() {
-  try {
-    const u = JSON.parse(localStorage.getItem("edtech_user") || "{}");
-    const b = JSON.parse(localStorage.getItem("edtech_school_branding") || "{}");
-    return { name: u.name || "Student", cls: u.class_name || "Class 6", school: b.school_name || "EdTech Island" };
-  } catch { return { name: "Student", cls: "Class 6", school: "EdTech Island" }; }
 }
 
 /* ── Parse SSE line ── */
@@ -159,19 +161,8 @@ export default function useGeminiChat() {
     const text = userText?.trim() || "";
     if (!text && !audioPayload) return null;
 
-    const apiKey = getApiKey();
-    if (!apiKey || apiKey === "YOUR_KEY_HERE" || apiKey === "YOUR_GEMINI_API_KEY") {
-      const w = "Gemini API key not set. Please provide your Gemini API key.";
-      setMessages(prev => {
-        const next = [...prev, { role:"user", text: text || "🎤 Spoken question" }, { role:"model", text: w }];
-        saveMessages(next);
-        return next;
-      });
-      return null;
-    }
-
     const autoFrame = screenshotBase64 ?? (screenCapture.isActive() ? screenCapture.capture() : null);
-    const screen    = getDetailedScreenContext();
+    const screenContext = getDetailedScreenContext();
     const displayText = text || "🎤 (Voice question)";
 
     setMessages(prev => [...prev, { role:"user", text: displayText, hasScreenshot: !!autoFrame }]);
@@ -181,50 +172,8 @@ export default function useGeminiChat() {
     if (document.title) trackTopic(document.title);
     incrementMessages();
 
-    // User prompt parts with rich detailed screen context
-    const userParts = [
-      { text: `[CURRENT STUDENT SCREEN CONTEXT]:\n${screen}` },
-    ];
-    if (text) {
-      userParts.push({ text });
-    } else {
-      userParts.push({ text: "The student asked the following question via microphone audio. Please listen directly to their voice audio and answer Socratically, warmly, and concisely." });
-    }
-    if (audioPayload?.data) {
-      userParts.push({
-        inline_data: {
-          mime_type: audioPayload.mimeType || "audio/webm",
-          data: audioPayload.data
-        }
-      });
-    }
-    if (autoFrame) {
-      userParts.push({ inline_data: { mime_type: "image/jpeg", data: autoFrame } });
-    }
-
     historyRef.current.push({ role: "user", parts: [{ text: displayText }] });
     if (historyRef.current.length > MAX_HISTORY) historyRef.current = historyRef.current.slice(-MAX_HISTORY);
-
-    const contents = [
-      ...historyRef.current.slice(0, -1),
-      { role: "user", parts: userParts },
-    ];
-
-    const s = getStudentInfo();
-    const sess = buildSessionContext();
-
-    const systemText =
-`You are Aria, an intelligent Socratic AI tutor for ${s.school}, tutoring ${s.name} (${s.cls}).
-${sess ? sess + "\n" : ""}
-CRITICAL CONTEXT AWARENESS:
-- You receive [CURRENT STUDENT SCREEN CONTEXT] with the student's exact active portal, page, selected menu option, and active learning chapter.
-- Always know exactly which section or option the student is looking at (e.g. Dashboard, Courses, Timetable, Light & Shadows module, 3D Study Island).
-- If the student asks "where am I?", "what is this?", or mentions an option on screen, reference their exact current option and topic accurately!
-
-RULES:
-- Provide intuitive Socratic guidance: Help the student explore concepts.
-- NO markdown asterisks (*, **), NO hashtags (#), NO bullet lists. Write in clean spoken conversational sentences.
-- Keep replies brief (under 45 words) and end with a guiding thought or encouragement.`;
 
     const streamId = ++_id;
     setMessages(prev => [...prev, { role:"model", text:"", streaming:true, id:streamId }]);
@@ -232,55 +181,50 @@ RULES:
 
     let accumulated = "";
     try {
-      const streamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
-      const res = await fetch(streamUrl, {
-        method: "POST",
+      const sessionToken = await getSessionToken();
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + sessionToken
         },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemText }] },
-          contents,
-          generationConfig: {
-            temperature: 0.5,
-            maxOutputTokens: 100,
-            topP: 0.85
-          },
-        }),
+        body: JSON.stringify({ message: text || displayText, context: screenContext })
       });
 
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
-        const errDetail = e?.error?.message || `HTTP ${res.status}`;
-        if (res.status === 401) {
-          throw new Error("Authentication failed (401). Please verify Generative Language API is enabled for this key at https://aistudio.google.com/apikey");
-        }
+        const errDetail = e?.error?.message || e?.error || e?.message || `HTTP ${res.status}`;
         throw new Error(errDetail);
       }
 
-      const reader = res.body.getReader();
-      const dec    = new TextDecoder();
-      let buf = "";
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('text/event-stream') && res.body?.getReader) {
+        const reader = res.body.getReader();
+        const dec    = new TextDecoder();
+        let buf = "";
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let nl;
-        while ((nl = buf.indexOf("\n")) !== -1) {
-          const line = buf.slice(0, nl).trim();
-          buf = buf.slice(nl + 1);
-          const tok = parseSSE(line);
-          if (tok) {
-            accumulated += tok;
-            setMessages(prev => prev.map(m => m.id === streamId ? { ...m, text: accumulated } : m));
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let nl;
+          while ((nl = buf.indexOf("\n")) !== -1) {
+            const line = buf.slice(0, nl).trim();
+            buf = buf.slice(nl + 1);
+            const tok = parseSSE(line);
+            if (tok) {
+              accumulated += tok;
+              setMessages(prev => prev.map(m => m.id === streamId ? { ...m, text: accumulated } : m));
+            }
           }
         }
+      } else {
+        const data = await res.json();
+        accumulated = data.reply || data.text || data.message || data.content || (typeof data === 'string' ? data : '');
       }
 
       setMessages(prev => {
-        const finalized = prev.map(m => m.id === streamId ? { ...m, streaming: false } : m);
+        const finalized = prev.map(m => m.id === streamId ? { ...m, text: accumulated, streaming: false } : m);
         saveMessages(finalized);
         return finalized;
       });
@@ -308,7 +252,7 @@ RULES:
   }, []);
 
   const clearHistory = useCallback(() => {
-    try { localStorage.removeItem("aria_chat_history"); } catch {}
+    try { localStorage.removeItem("aria_chat_history"); } catch { /* ignore storage error */ }
     setMessages([]);
     historyRef.current = [];
     msgCountRef.current = 0;

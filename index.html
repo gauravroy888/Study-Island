@@ -88,7 +88,7 @@
       (function() {
         var url = 'https://qmyrxvtbzlbnvzxypnus.supabase.co/rest/v1/custom_courses?select=id,category&is_published=eq.true';
         var key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFteXJ4dnRiemxibnZ6eHlwbnVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA4OTcsImV4cCI6MjA5NTM5Njg5N30.ABvW_oBzXC2Ffxm5ToLh6t4WmdKPdtg9SyfeAE76iJo';
-        fetch(url, { headers: { 'apikey': key, 'Authorization': 'Bearer ' + key } })
+        fetch(url, { headers: { 'apikey': key } })
           .then(function(r) { return r.json(); })
           .then(function(data) {
             if (Array.isArray(data) && data.length > 0) {

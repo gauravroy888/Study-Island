@@ -1,14 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Card from '../components/Card';
-import { Search, Users, Shield, Megaphone, BookOpen, Settings } from 'lucide-react';
+import { Users, Shield, Megaphone, BookOpen } from 'lucide-react';
 import { supabase } from '../supabase';
 import ChatInterface from '../components/ChatInterface';
+
+const isRecentAnnouncement = (createdAt, lastViewed) => {
+  const time = new Date(createdAt).getTime();
+  return time > lastViewed && (Date.now() - time < 24 * 60 * 60 * 1000);
+};
 
 export default function Inbox() {
   const [activeTab, setActiveTab] = useState('students'); // 'students' | 'classes' | 'staff' | 'announcements' | 'groups'
   const [selectedClass, setSelectedClass] = useState('All Classes');
   const classesList = ['Class 1st', 'Class 2nd', 'Class 3rd', 'Class 4th', 'Class 5th', 'Class 6th'];
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser] = useState(() => {
+    try {
+      const userStr = localStorage.getItem('edtech_user');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch {
+      return null;
+    }
+  });
   const [announcements, setAnnouncements] = useState([]);
   const [unreadCounts, setUnreadCounts] = useState({ students: 0, staff: 0 });
   // Bug 3 fix: stable callback reference so ChatInterface's effect dep doesn't re-fire on every render
@@ -22,33 +34,35 @@ export default function Inbox() {
   useEffect(() => {
     if (activeTab === 'announcements') {
       const now = Date.now();
-      setLastViewedAnnouncements(now);
+      const timer = setTimeout(() => {
+        setLastViewedAnnouncements(now);
+      }, 0);
       localStorage.setItem('teacher_last_announcements_view', now.toString());
+      return () => clearTimeout(timer);
     }
   }, [activeTab]);
 
-  useEffect(() => {
-    const userStr = localStorage.getItem('edtech_user');
-    if (userStr) {
-      try { setCurrentUser(JSON.parse(userStr)); } catch (e) {}
-    }
-  }, []);
-
   // Fetch announcements
   useEffect(() => {
+    let isMounted = true;
     const fetchAnnouncements = async () => {
-      const { data, error } = await supabase.from('announcements').select('*').order('createdAt', { ascending: false });
-      if (data) setAnnouncements(data);
+      const { data, error } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
+      if (data && isMounted) setAnnouncements(data);
       if (error) console.warn('Announcements fetch error:', error.message);
     };
-    
-    fetchAnnouncements();
-    
+
+    void fetchAnnouncements();
+
     const subscription = supabase.channel('teacher_announcements')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, fetchAnnouncements)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        if (isMounted) fetchAnnouncements();
+      })
       .subscribe();
-      
-    return () => { supabase.removeChannel(subscription); };
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   return (
@@ -58,10 +72,10 @@ export default function Inbox() {
           <h1>Inbox & Announcements</h1>
           <p>Manage your communications and stay up to date.</p>
         </div>
-        
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '30px', padding: '5px' }}>
-            <button 
+            <button
               onClick={() => setActiveTab('students')}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
@@ -78,7 +92,7 @@ export default function Inbox() {
                 </span>
               )}
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('classes')}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
@@ -90,7 +104,7 @@ export default function Inbox() {
             >
               <BookOpen size={16} /> Classes
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('groups')}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
@@ -107,7 +121,7 @@ export default function Inbox() {
                 </span>
               )}
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('staff')}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
@@ -124,7 +138,7 @@ export default function Inbox() {
                 </span>
               )}
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('announcements')}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
@@ -135,15 +149,9 @@ export default function Inbox() {
               }}
             >
               <Megaphone size={16} /> Updates
-              {announcements.filter(a => {
-                const time = new Date(a.createdAt).getTime();
-                return time > lastViewedAnnouncements && (Date.now() - time < 24 * 60 * 60 * 1000);
-              }).length > 0 && (
+              {announcements.filter(a => isRecentAnnouncement(a.createdAt, lastViewedAnnouncements)).length > 0 && (
                 <span style={{ background: '#FF6B6B', color: '#fff', position: 'absolute', top: '-5px', right: '-5px', fontSize: '10px', padding: '2px 6px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {announcements.filter(a => {
-                    const time = new Date(a.createdAt).getTime();
-                    return time > lastViewedAnnouncements && (Date.now() - time < 24 * 60 * 60 * 1000);
-                  }).length}
+                  {announcements.filter(a => isRecentAnnouncement(a.createdAt, lastViewedAnnouncements)).length}
                 </span>
               )}
             </button>
@@ -198,9 +206,9 @@ export default function Inbox() {
             </div>
             <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
               {selectedClass ? (
-                <ChatInterface 
-                  currentUser={currentUser} 
-                  activeTab="class_view" 
+                <ChatInterface
+                  currentUser={currentUser}
+                  activeTab="class_view"
                   selectedClass={selectedClass}
                   isManager={true}
                   onUnreadCountChange={handleUnreadCountChange}
@@ -215,12 +223,12 @@ export default function Inbox() {
             </div>
           </div>
         ) : (
-          <ChatInterface 
-            currentUser={currentUser} 
+          <ChatInterface
+            currentUser={currentUser}
             activeTab={activeTab}
             selectedClass={selectedClass}
             isManager={true}
-            onUnreadCountChange={handleUnreadCountChange} 
+            onUnreadCountChange={handleUnreadCountChange}
           />
         )}
       </Card>

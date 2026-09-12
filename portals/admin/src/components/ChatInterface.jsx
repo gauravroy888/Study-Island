@@ -1,43 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Search, Send, ArrowLeft, MoreVertical, MessageSquare, Check, CheckCheck, 
-  Paperclip, Loader2, X, Maximize2, Pin, Reply, Trash2, Search as SearchIcon, Smile, 
-  Copy, Forward 
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import {
+  Search, Send, ArrowLeft, MessageSquare, Check, CheckCheck,
+  Paperclip, Loader2, X, Maximize2, Smile
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { compressToJpeg } from '../lib/compressImage';
 import { uploadImageToR2 } from '../lib/r2';
 import EmojiPicker from './EmojiPicker';
-import { 
-  LinkPreviewCard, ImageLightbox, WhatsAppMessageActionToolbar, WhatsAppReactionBadge, 
-  QuotedMessageBubble, PinnedMessageBanner, TypingIndicatorBanner, ForwardedMessageTag, 
-  ForwardMessageModal, extractFirstUrl, formatMessageWithLinks, formatTimeAgo 
+import {
+  LinkPreviewCard, ImageLightbox, WhatsAppMessageActionToolbar, WhatsAppReactionBadge,
+  QuotedMessageBubble, PinnedMessageBanner, TypingIndicatorBanner, ForwardedMessageTag,
+  ForwardMessageModal, extractFirstUrl, formatMessageWithLinks, formatTimeAgo
 } from './MediaChatComponents';
 import { usePresence } from '../hooks/usePresence';
 import './ChatInterface.css';
 
-export default function ChatInterface({ currentUser: propUser, activeTab, onUnreadCountChange }) {
+export default function ChatInterface({ currentUser: propUser, onUnreadCountChange }) {
   // Resolve current logged-in user with robust fallback
-  const [currentUser, setCurrentUser] = useState(() => {
+  const currentUser = useMemo(() => {
     if (propUser) return propUser;
     try {
       const stored = localStorage.getItem('edtech_user');
       return stored ? JSON.parse(stored) : { email: 'immersionlabsindia@gmail.com', name: 'Immersion Labs', role: 'admin' };
-    } catch (e) {
+    } catch {
       return { email: 'immersionlabsindia@gmail.com', name: 'Immersion Labs', role: 'admin' };
     }
-  });
-
-  useEffect(() => {
-    if (propUser) setCurrentUser(propUser);
   }, [propUser]);
 
   const [profiles, setProfiles] = useState([]);
   const [conversationsMap, setConversationsMap] = useState({});
-  const [filteredProfiles, setFilteredProfiles] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState("all"); // 'all' | 'students' | 'teachers'
-  
+
   const [activeContact, setActiveContact] = useState(null); // { id, name, email, role, avatar_url }
   const [currentConversation, setCurrentConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -58,7 +52,6 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activeDropdownMsgId, setActiveDropdownMsgId] = useState(null);
   const [forwardModalMessage, setForwardModalMessage] = useState(null);
-  const [copyToast, setCopyToast] = useState(false);
 
   const fileInputRef = useRef(null);
   const chatInputRef = useRef(null);
@@ -80,14 +73,14 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
   };
 
   // 2. Fetch Profiles & Conversations History
-  const fetchProfilesAndConversations = async () => {
+  const fetchProfilesAndConversations = useCallback(async () => {
     if (!currentUser?.email) return;
     try {
-      const { data: profData } = await supabase.from('profiles').select('*').order('name');
+      const { data: profData } = await supabase.from('profiles').select('id,name,email,role,avatar_url').order('name');
       const { data: userData } = await supabase.from('users').select('*');
-      
+
       const combinedMap = new Map();
-      
+
       if (userData && userData.length > 0) {
         userData.forEach(u => {
           const name = u.full_name || u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email;
@@ -133,55 +126,66 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
     } catch (err) {
       console.error("Error fetching profiles from Supabase:", err);
     }
-  };
+  }, [currentUser]);
 
   useEffect(() => {
-    fetchProfilesAndConversations();
-    
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await fetchProfilesAndConversations();
+    };
+    void init();
+
     const profilesSub = supabase.channel('public:profiles_sync_admin')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchProfilesAndConversations)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        if (isMounted) void fetchProfilesAndConversations();
+      })
       .subscribe();
 
     const usersSub = supabase.channel('public:users_sync_admin')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchProfilesAndConversations)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        if (isMounted) void fetchProfilesAndConversations();
+      })
       .subscribe();
 
     const convsSub = supabase.channel('public:conversations_sync_admin')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, fetchProfilesAndConversations)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
+        if (isMounted) void fetchProfilesAndConversations();
+      })
       .subscribe();
-      
-    return () => { 
-      supabase.removeChannel(profilesSub); 
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(profilesSub);
       supabase.removeChannel(usersSub);
       supabase.removeChannel(convsSub);
     };
-  }, [currentUser]);
+  }, [fetchProfilesAndConversations]);
 
   // 3. Fetch Unread Counts
-  const fetchUnreadCounts = async () => {
+  const fetchUnreadCounts = useCallback(async () => {
     if (!currentUser?.email) return;
-    
+
     try {
       const { data: myConvs } = await supabase.from('conversations')
         .select('id, participant1_email, participant2_email')
         .or(`participant1_email.eq.${currentUser.email},participant2_email.eq.${currentUser.email}`);
-        
+
       if (!myConvs || myConvs.length === 0) return;
       const convIds = myConvs.map(c => c.id);
-      
+
       const { data: unreadMsgs } = await supabase.from('messages')
         .select('senderEmail, conversationId')
         .in('conversationId', convIds)
         .eq('is_read', false)
         .neq('senderEmail', currentUser.email);
-        
+
       if (unreadMsgs) {
         const counts = {};
         unreadMsgs.forEach(msg => {
           counts[msg.senderEmail] = (counts[msg.senderEmail] || 0) + 1;
         });
         setUnreadCounts(counts);
-        
+
         const total = Object.values(counts).reduce((a, b) => a + b, 0);
         if (onUnreadCountChange) {
           onUnreadCountChange({ chat: total, total });
@@ -190,30 +194,37 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
     } catch (err) {
       console.error("Error fetching unread counts:", err);
     }
-  };
+  }, [currentUser, onUnreadCountChange]);
 
   useEffect(() => {
-    fetchUnreadCounts();
-    
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await fetchUnreadCounts();
+    };
+    void init();
+
     const unreadSub = supabase.channel('public:messages_unread_sync_admin')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        if (payload.new.senderEmail !== currentUser?.email) {
-          fetchUnreadCounts();
-          fetchProfilesAndConversations();
+        if (payload.new.senderEmail !== currentUser?.email && isMounted) {
+          void fetchUnreadCounts();
+          void fetchProfilesAndConversations();
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => {
-        fetchUnreadCounts();
+        if (isMounted) void fetchUnreadCounts();
       })
       .subscribe();
-      
-    return () => { supabase.removeChannel(unreadSub); };
-  }, [currentUser]);
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(unreadSub);
+    };
+  }, [currentUser?.email, fetchProfilesAndConversations, fetchUnreadCounts]);
 
   // 4. Filter & Sort Contacts (Active conversations first, then alphabetical)
-  useEffect(() => {
-    if (!profiles) return;
-    
+  const filteredProfiles = useMemo(() => {
+    if (!profiles) return [];
+
     let baseList = profiles.filter(p => p && p.email && (!currentUser?.email || p.email.toLowerCase() !== currentUser.email.toLowerCase()));
 
     if (filterRole === 'students') {
@@ -221,15 +232,15 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
     } else if (filterRole === 'teachers') {
       baseList = baseList.filter(p => p.role === 'teacher' || p.role === 'admin');
     }
-    
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      baseList = baseList.filter(p => 
-        (p.name && p.name.toLowerCase().includes(q)) || 
+      baseList = baseList.filter(p =>
+        (p.name && p.name.toLowerCase().includes(q)) ||
         (p.email && p.email.toLowerCase().includes(q))
       );
     }
-    
+
     // Sort contacts by latest conversation activity (updatedAt descending)
     baseList.sort((a, b) => {
       const emailA = (a.email || '').toLowerCase();
@@ -241,8 +252,39 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
       return timeB - timeA;
     });
 
-    setFilteredProfiles(baseList);
+    return baseList;
   }, [profiles, conversationsMap, filterRole, searchQuery, currentUser]);
+
+  useEffect(() => {
+    if (filteredProfiles.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const targetEmail = params.get('email');
+      const targetName = params.get('name');
+
+      let target = null;
+      if (targetEmail) {
+        target = filteredProfiles.find(p => p.email?.toLowerCase() === targetEmail.toLowerCase());
+      }
+      if (!target && targetName) {
+        target = filteredProfiles.find(p => p.name?.toLowerCase().includes(targetName.toLowerCase()));
+      }
+
+      const timer = setTimeout(() => {
+        setActiveContact(current => {
+          if (target) return target;
+          if (!current) return filteredProfiles[0];
+          const exists = filteredProfiles.find(p => p.email === current.email);
+          return exists ? current : filteredProfiles[0];
+        });
+      }, 0);
+      return () => clearTimeout(timer);
+    } else {
+      const timer = setTimeout(() => {
+        setActiveContact(null);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [filteredProfiles]);
 
   // 5. Fetch or Create 1-on-1 Direct Conversation
   useEffect(() => {
@@ -250,24 +292,24 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
 
     const fetchOrCreateConversation = async () => {
       try {
-        const { data, error } = await supabase.from('conversations')
+        const { data } = await supabase.from('conversations')
           .select('*')
           .or(`and(participant1_email.eq.${currentUser.email},participant2_email.eq.${activeContact.email}),and(participant1_email.eq.${activeContact.email},participant2_email.eq.${currentUser.email})`)
           .maybeSingle();
-          
+
         if (data) {
           setCurrentConversation(data);
         } else {
           const { data: newConv, error: createErr } = await supabase.from('conversations')
-            .insert({ 
-              participant1_email: currentUser.email, 
+            .insert({
+              participant1_email: currentUser.email,
               participant2_email: activeContact.email,
               type: 'direct',
               lastMessage: 'Conversation opened'
             })
             .select()
             .single();
-            
+
           if (newConv) setCurrentConversation(newConv);
           if (createErr) console.error("Error creating direct conversation:", createErr);
         }
@@ -275,18 +317,18 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
         console.error("Error in fetchOrCreateConversation:", err);
       }
     };
-    fetchOrCreateConversation();
+    void fetchOrCreateConversation();
   }, [activeContact, currentUser]);
 
   // 6. Fetch Messages & Realtime Subscription + Typing Broadcast
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     if (!currentConversation?.id) return;
     try {
       const { data } = await supabase.from('messages')
         .select('*')
         .eq('conversationId', currentConversation.id)
         .order('createdAt', { ascending: true });
-      
+
       if (data) {
         setMessages(data);
         setTimeout(() => scrollToBottom(false), 50);
@@ -294,29 +336,38 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
     } catch (err) {
       console.error("Error fetching messages:", err);
     }
-  };
+  }, [currentConversation?.id]);
 
   useEffect(() => {
-    fetchMessages();
-    setTypingUser(null);
-    if (!currentConversation?.id) return;
-    
+    let isMounted = true;
+    const init = async () => {
+      await Promise.resolve();
+      if (!isMounted) return;
+      setTypingUser(null);
+      await fetchMessages();
+    };
+    void init();
+    if (!currentConversation?.id) return () => { isMounted = false; };
+
     const channelName = `public:messages:${currentConversation.id}`;
     const channel = supabase.channel(channelName)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'messages', 
-        filter: `conversationId=eq.${currentConversation.id}` 
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversationId=eq.${currentConversation.id}`
       }, (payload) => {
+        if (!isMounted) return;
         setMessages(prev => {
           if (prev.some(m => m.id === payload.new.id)) return prev;
           return [...prev, payload.new];
         });
         setTimeout(() => scrollToBottom(true), 50);
-        
+
         if (payload.new.senderEmail !== currentUser?.email) {
-          supabase.from('messages').update({ is_read: true }).eq('id', payload.new.id).then(() => fetchUnreadCounts());
+          supabase.from('messages').update({ is_read: true }).eq('id', payload.new.id).then(() => {
+            if (isMounted) void fetchUnreadCounts();
+          });
         }
       })
       .on('postgres_changes', {
@@ -325,7 +376,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
         table: 'messages',
         filter: `conversationId=eq.${currentConversation.id}`
       }, (payload) => {
-        setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
+        if (isMounted) setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
       })
       .on('postgres_changes', {
         event: 'DELETE',
@@ -333,9 +384,10 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
         table: 'messages',
         filter: `conversationId=eq.${currentConversation.id}`
       }, (payload) => {
-        setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+        if (isMounted) setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (!isMounted) return;
         if (payload.senderEmail !== currentUser?.email) {
           if (payload.isTyping) {
             setTypingUser(payload.senderName || 'Someone');
@@ -347,17 +399,18 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
       .subscribe();
 
     activeChannelRef.current = channel;
-      
-    return () => { 
-      supabase.removeChannel(channel); 
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
       activeChannelRef.current = null;
     };
-  }, [currentConversation]);
+  }, [currentConversation?.id, currentUser?.email, fetchMessages, fetchUnreadCounts]);
 
   // Mark all unread messages as read when conversation opens
   useEffect(() => {
     if (!currentConversation?.id || !activeContact?.email || !currentUser?.email) return;
-    
+
     const markAsRead = async () => {
       try {
         await supabase.from('messages')
@@ -365,15 +418,15 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
           .eq('conversationId', currentConversation.id)
           .neq('senderEmail', currentUser.email)
           .eq('is_read', false);
-          
+
         setUnreadCounts(prev => ({ ...prev, [activeContact.email]: 0 }));
-        fetchUnreadCounts();
+        void fetchUnreadCounts();
       } catch (err) {
         console.error("Error marking messages as read:", err);
       }
     };
-    markAsRead();
-  }, [currentConversation, activeContact, currentUser]);
+    void markAsRead();
+  }, [currentConversation, activeContact, currentUser, fetchUnreadCounts]);
 
   // Broadcast Typing Handler
   const handleInputChange = (e) => {
@@ -517,8 +570,6 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
     const textToCopy = msg.text || msg.attachment_url || '';
     if (textToCopy && navigator.clipboard) {
       navigator.clipboard.writeText(textToCopy);
-      setCopyToast(true);
-      setTimeout(() => setCopyToast(false), 2000);
     }
   };
 
@@ -529,7 +580,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
     for (const target of targetContacts) {
       try {
         let convId = target.id;
-        
+
         if (!target.isGroup) {
           // Find or create conversation with this direct contact
           const { data: existingConv } = await supabase.from('conversations')
@@ -568,8 +619,8 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
 
           await supabase.from('messages').insert(forwardPayload);
 
-          const previewText = msg.attachment_type === 'image' 
-            ? (msg.text ? `📷 ${msg.text}` : '📷 Photo') 
+          const previewText = msg.attachment_type === 'image'
+            ? (msg.text ? `📷 ${msg.text}` : '📷 Photo')
             : msg.text;
 
           await supabase.from('conversations')
@@ -622,11 +673,11 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if ((!newMessage.trim() && !stagedImage?.blob) || !currentConversation?.id || !currentUser?.email || isSending || isUploading) return;
-    
+
     const msgText = newMessage.trim();
     const currentStaged = stagedImage;
     const currentReply = stagedReply;
-    
+
     setNewMessage('');
     setStagedImage(null);
     setStagedReply(null);
@@ -640,7 +691,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
         payload: { senderEmail: currentUser.email, isTyping: false }
       });
     }
-    
+
     try {
       let attachmentUrl = null;
       let attachmentType = null;
@@ -671,7 +722,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
       };
 
       const { data: insertedMsg, error: msgError } = await supabase.from('messages').insert(payload).select().single();
-      
+
       if (msgError) throw msgError;
 
       setMessages(prev => {
@@ -680,8 +731,8 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
       });
       setTimeout(() => scrollToBottom(true), 50);
 
-      const previewText = attachmentType === 'image' 
-        ? (msgText ? `📷 ${msgText}` : '📷 Photo') 
+      const previewText = attachmentType === 'image'
+        ? (msgText ? `📷 ${msgText}` : '📷 Photo')
         : msgText;
 
       await supabase.from('conversations')
@@ -705,8 +756,8 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
   const facultyCount = profiles.filter(p => (p.role === 'teacher' || p.role === 'admin') && p.email !== currentUser?.email).length;
   const totalCount = profiles.filter(p => p.email !== currentUser?.email).length;
 
-  const pinnedMsg = currentConversation?.pinned_message_id 
-    ? messages.find(m => m.id === currentConversation.pinned_message_id) 
+  const pinnedMsg = currentConversation?.pinned_message_id
+    ? messages.find(m => m.id === currentConversation.pinned_message_id)
     : null;
 
   const displayMessages = inChatSearchQuery.trim()
@@ -720,33 +771,33 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
         <div className="chat-sidebar-header">
           <div className="chat-search-wrapper">
             <Search size={16} className="chat-search-icon" />
-            <input 
-              type="text" 
-              placeholder="Search contacts..." 
-              className="chat-search-input" 
-              value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)} 
+            <input
+              type="text"
+              placeholder="Search contacts..."
+              className="chat-search-input"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
 
         {/* Filter Category Chips */}
         <div className="chat-filter-chips">
-          <button 
+          <button
             type="button"
             className={`chat-chip ${filterRole === 'all' ? 'active' : ''}`}
             onClick={() => setFilterRole('all')}
           >
             All ({totalCount})
           </button>
-          <button 
+          <button
             type="button"
             className={`chat-chip ${filterRole === 'students' ? 'active' : ''}`}
             onClick={() => setFilterRole('students')}
           >
             Students ({studentCount})
           </button>
-          <button 
+          <button
             type="button"
             className={`chat-chip ${filterRole === 'teachers' ? 'active' : ''}`}
             onClick={() => setFilterRole('teachers')}
@@ -754,7 +805,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
             Faculty ({facultyCount})
           </button>
         </div>
-        
+
         {/* Contact List with Last Message & Online Presence */}
         <div className="chat-contacts-list">
           {filteredProfiles.length > 0 ? (
@@ -765,16 +816,16 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
               const conv = conversationsMap[contact.email.toLowerCase()];
 
               return (
-                <div 
-                  key={contact.id || contact.email} 
-                  className={`chat-contact-item ${isSelected ? 'active' : ''}`} 
+                <div
+                  key={contact.id || contact.email}
+                  className={`chat-contact-item ${isSelected ? 'active' : ''}`}
                   onClick={() => setActiveContact(contact)}
                 >
                   <div className="chat-contact-avatar">
                     <div className="presence-avatar-wrapper">
-                      <img 
-                        src={contact.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(contact.email || contact.name)}&backgroundColor=0a0f1d`} 
-                        alt={contact.name} 
+                      <img
+                        src={contact.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(contact.email || contact.name)}&backgroundColor=0a0f1d`}
+                        alt={contact.name}
                         onError={(e) => {
                           e.target.onerror = null;
                           e.target.src = `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(contact.email || contact.name)}&backgroundColor=0a0f1d`;
@@ -807,7 +858,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
           )}
         </div>
       </div>
-      
+
       {/* Right Pane: Active Chat Area */}
       <div className={`chat-main-area ${!activeContact ? 'hidden-mobile' : ''}`}>
         {activeContact ? (
@@ -818,9 +869,9 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
               </button>
               <div className="chat-header-avatar">
                 <div className="presence-avatar-wrapper">
-                  <img 
-                    src={activeContact.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(activeContact.email || activeContact.name)}&backgroundColor=0a0f1d`} 
-                    alt={activeContact.name} 
+                  <img
+                    src={activeContact.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(activeContact.email || activeContact.name)}&backgroundColor=0a0f1d`}
+                    alt={activeContact.name}
                   />
                   {isOnline(activeContact.email) && <span className="presence-dot" />}
                 </div>
@@ -841,14 +892,14 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
                 </span>
               </div>
               <div className="chat-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="chat-action-btn"
-                  onClick={() => setShowInChatSearch(!showInChatSearch)} 
+                  onClick={() => setShowInChatSearch(!showInChatSearch)}
                   title="Search inside conversation"
                   style={{ background: showInChatSearch ? 'rgba(0, 240, 255, 0.2)' : 'transparent' }}
                 >
-                  <SearchIcon size={18} />
+                  <Search size={18} />
                 </button>
               </div>
             </div>
@@ -857,9 +908,9 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
             {showInChatSearch && (
               <div className="chat-in-search-bar">
                 <Search size={14} style={{ opacity: 0.7 }} />
-                <input 
-                  type="text" 
-                  placeholder="Search in this conversation..." 
+                <input
+                  type="text"
+                  placeholder="Search in this conversation..."
                   className="chat-in-search-input"
                   value={inChatSearchQuery}
                   onChange={(e) => setInChatSearchQuery(e.target.value)}
@@ -875,13 +926,13 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
 
             {/* Pinned Message Banner */}
             {pinnedMsg && (
-              <PinnedMessageBanner 
-                pinnedMessage={pinnedMsg} 
-                onScrollToPinned={() => scrollToMessageId(pinnedMsg.id)} 
-                onUnpin={() => handleTogglePin(pinnedMsg)} 
+              <PinnedMessageBanner
+                pinnedMessage={pinnedMsg}
+                onScrollToPinned={() => scrollToMessageId(pinnedMsg.id)}
+                onUnpin={() => handleTogglePin(pinnedMsg)}
               />
             )}
-            
+
             <div className="chat-messages-area">
               {displayMessages.length === 0 ? (
                 <div className="chat-messages-empty">
@@ -898,14 +949,14 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
                   const isDropdownOpen = activeDropdownMsgId === msg.id;
 
                   return (
-                    <div 
-                      key={msg.id || idx} 
+                    <div
+                      key={msg.id || idx}
                       id={`msg-${msg.id}`}
                       className={`chat-bubble-wrapper ${isMe ? 'is-me' : 'is-them'} ${hasReactions ? 'has-reactions' : ''}`}
                     >
                       {/* Outgoing message: action buttons appear to the left of the bubble */}
                       {isMe && !msg.is_deleted && (
-                        <WhatsAppMessageActionToolbar 
+                        <WhatsAppMessageActionToolbar
                           isMe={isMe}
                           isPinned={isPinned}
                           showDropdown={isDropdownOpen}
@@ -925,23 +976,23 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
 
                         {/* Quoted Message */}
                         {msg.reply_to_text && (
-                          <QuotedMessageBubble 
-                            replyToSender={msg.reply_to_sender} 
-                            replyToText={msg.reply_to_text} 
-                            onScrollToOriginal={() => scrollToMessageId(msg.reply_to_id)} 
+                          <QuotedMessageBubble
+                            replyToSender={msg.reply_to_sender}
+                            replyToText={msg.reply_to_text}
+                            onScrollToOriginal={() => scrollToMessageId(msg.reply_to_id)}
                           />
                         )}
 
                         {/* Image Attachment */}
                         {hasImage && (
-                          <div 
+                          <div
                             className="chat-bubble-image-container"
                             onClick={() => setActiveLightboxImg(msg.attachment_url)}
                           >
-                            <img 
-                              src={msg.attachment_url} 
-                              alt="Chat photo" 
-                              className="chat-bubble-image" 
+                            <img
+                              src={msg.attachment_url}
+                              alt="Chat photo"
+                              className="chat-bubble-image"
                               loading="lazy"
                             />
                             <div className="chat-bubble-image-overlay" title="Click to enlarge">
@@ -982,17 +1033,17 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
 
                         {/* WhatsApp-Style Floating Reaction Badge at Bottom Corner */}
                         {!msg.is_deleted && (
-                          <WhatsAppReactionBadge 
-                            reactions={msg.reactions} 
-                            currentEmail={currentUser.email} 
-                            onToggleReaction={(emoji) => handleToggleReaction(msg.id, emoji)} 
+                          <WhatsAppReactionBadge
+                            reactions={msg.reactions}
+                            currentEmail={currentUser.email}
+                            onToggleReaction={(emoji) => handleToggleReaction(msg.id, emoji)}
                           />
                         )}
                       </div>
 
                       {/* Incoming message: action buttons appear to the right of the bubble */}
                       {!isMe && !msg.is_deleted && (
-                        <WhatsAppMessageActionToolbar 
+                        <WhatsAppMessageActionToolbar
                           isMe={isMe}
                           isPinned={isPinned}
                           showDropdown={isDropdownOpen}
@@ -1023,9 +1074,9 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
                   <span className="chat-staged-reply-sender">Replying to {stagedReply.senderName}</span>
                   <span className="chat-staged-reply-text">{stagedReply.text}</span>
                 </div>
-                <button 
-                  type="button" 
-                  className="chat-staged-reply-close" 
+                <button
+                  type="button"
+                  className="chat-staged-reply-close"
                   onClick={() => setStagedReply(null)}
                   title="Cancel reply"
                 >
@@ -1051,9 +1102,9 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
                     )}
                   </div>
                 </div>
-                <button 
-                  type="button" 
-                  className="chat-staged-media-remove" 
+                <button
+                  type="button"
+                  className="chat-staged-media-remove"
                   onClick={handleRemoveStagedImage}
                   title="Remove image"
                 >
@@ -1061,27 +1112,27 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
                 </button>
               </div>
             )}
-            
+
             <form className="chat-input-area" onSubmit={handleSendMessage} style={{ position: 'relative' }}>
               {/* WhatsApp Emoji Picker Dropdown */}
               {showEmojiPicker && (
-                <EmojiPicker 
-                  onSelectEmoji={handleInsertEmoji} 
-                  onClose={() => setShowEmojiPicker(false)} 
+                <EmojiPicker
+                  onSelectEmoji={handleInsertEmoji}
+                  onClose={() => setShowEmojiPicker(false)}
                 />
               )}
 
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                accept="image/*" 
-                style={{ display: 'none' }} 
-                onChange={handleFileSelect} 
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleFileSelect}
               />
-              <button 
-                type="button" 
-                className="chat-attach-btn" 
-                onClick={() => fileInputRef.current?.click()} 
+              <button
+                type="button"
+                className="chat-attach-btn"
+                onClick={() => fileInputRef.current?.click()}
                 title="Share Image (Auto-compressed to JPEG ≤ 2MB)"
                 disabled={isSending || isUploading || stagedImage?.isCompressing}
               >
@@ -1089,29 +1140,29 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
               </button>
 
               {/* WhatsApp Smile Emoji Button */}
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className={`chat-attach-btn ${showEmojiPicker ? 'active' : ''}`}
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 title="Insert Emoji"
                 style={{ color: showEmojiPicker ? 'var(--brand-primary, #00F0FF)' : 'inherit' }}
               >
                 <Smile size={20} />
               </button>
 
-              <input 
+              <input
                 ref={chatInputRef}
-                type="text" 
-                placeholder={stagedImage ? "Add a caption..." : (stagedReply ? `Reply to ${stagedReply.senderName}...` : `Type a message...`)} 
-                className="chat-input" 
-                value={newMessage} 
-                onChange={handleInputChange} 
+                type="text"
+                placeholder={stagedImage ? "Add a caption..." : (stagedReply ? `Reply to ${stagedReply.senderName}...` : `Type a message...`)}
+                className="chat-input"
+                value={newMessage}
+                onChange={handleInputChange}
                 disabled={isSending || isUploading}
               />
-              
-              <button 
-                type="submit" 
-                className="chat-send-btn" 
+
+              <button
+                type="submit"
+                className="chat-send-btn"
                 disabled={(!newMessage.trim() && !stagedImage?.blob) || isSending || isUploading || stagedImage?.isCompressing}
                 title="Send Message"
               >
@@ -1132,19 +1183,19 @@ export default function ChatInterface({ currentUser: propUser, activeTab, onUnre
 
       {/* WhatsApp Forward Modal */}
       {forwardModalMessage && (
-        <ForwardMessageModal 
-          message={forwardModalMessage} 
-          contacts={filteredProfiles} 
-          onForward={handleForwardMessage} 
-          onClose={() => setForwardModalMessage(null)} 
+        <ForwardMessageModal
+          message={forwardModalMessage}
+          contacts={filteredProfiles}
+          onForward={handleForwardMessage}
+          onClose={() => setForwardModalMessage(null)}
         />
       )}
 
       {/* Lightbox Modal */}
       {activeLightboxImg && (
-        <ImageLightbox 
-          imageUrl={activeLightboxImg} 
-          onClose={() => setActiveLightboxImg(null)} 
+        <ImageLightbox
+          imageUrl={activeLightboxImg}
+          onClose={() => setActiveLightboxImg(null)}
         />
       )}
     </div>

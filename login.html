@@ -278,10 +278,10 @@
                             return;
                         }
 
-                        // Fetch the full profile to confirm role and get display data
+                        // Fetch the profile to confirm role and get display data (explicit safe fields, no password/login_id)
                         const { data: profile } = await window.supabase
                             .from('profiles')
-                            .select('*')
+                            .select('id, auth_id, email, name, role, avatar_url, department, age, timetable, is_archived')
                             .eq('auth_id', authData.user.id)
                             .single();
 

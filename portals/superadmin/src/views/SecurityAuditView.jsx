@@ -1,6 +1,6 @@
 import React from 'react';
 
-export function SecurityAuditView({ logs, isLogsLoading, onLogIncident, onResolveIncident, onRefreshLogs }) {
+export function SecurityAuditView({ logs, isLogsLoading, _onLogIncident, onResolveIncident, onRefreshLogs }) {
       const [categoryFilter, setCategoryFilter] = React.useState('ALL');
       const [filterTerm, setFilterTerm] = React.useState('');
 

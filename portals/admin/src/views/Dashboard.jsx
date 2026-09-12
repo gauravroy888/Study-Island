@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Users, MessageSquare, CheckCircle, ArrowRight, BookOpen, Clock, Activity, ShieldAlert, ExternalLink, Loader2, Megaphone, X } from 'lucide-react';
+import { Calendar, Users, MessageSquare, CheckCircle, ArrowRight, BookOpen, Activity, Megaphone, X } from 'lucide-react';
 import Card from '../components/Card';
 import { supabase } from '../supabase';
 
@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     async function loadDashboardMetrics() {
       try {
         // 1. Student count
@@ -46,41 +47,50 @@ export default function Dashboard() {
           .from('announcements')
           .select('*')
           .order('createdAt', { ascending: false })
-          .limit(2);
+          .limit(3);
+
+        if (!isMounted) return;
 
         setStats({
           studentsCount: studentCount || 0,
-          teachersCount: teacherCount || (dbTeachers ? dbTeachers.length : 0),
+          teachersCount: teacherCount || 0,
           classesCount: classCount || 0,
           coursesCount: courseCount || 0
         });
 
-        if (dbAnnouncements && dbAnnouncements.length > 0) {
-          setRecentAnnouncements(dbAnnouncements.slice(0, 2));
-          const bcast = dbAnnouncements[0];
-          const dismissedId = localStorage.getItem('edtech_dismissed_dashboard_broadcast');
-          if (dismissedId !== (bcast.id?.toString() || bcast.title)) {
-            setLatestBroadcast(bcast);
-          }
+        if (dbTeachers && dbTeachers.length > 0) {
+          setFacultyMembers(dbTeachers.slice(0, 5).map(t => ({
+            id: t.id,
+            name: t.full_name || t.name || t.email.split('@')[0],
+            role: t.role === 'teacher' ? 'Subject Faculty' : t.role,
+            department: t.department || 'Academic Faculty',
+            email: t.email
+          })));
+        } else {
+          setFacultyMembers([]);
         }
 
-        const mappedTeachers = (dbTeachers || []).map(t => ({
-          name: t.full_name || t.name || t.email.split('@')[0],
-          email: t.email,
-          role: t.role === 'teacher' ? 'Subject Faculty' : t.role
-        }));
-        setFacultyMembers(mappedTeachers);
-      } catch (e) {
-        console.error('Error fetching dashboard data:', e);
+        if (dbAnnouncements && dbAnnouncements.length > 0) {
+          setRecentAnnouncements(dbAnnouncements);
+          // Set top announcement as broadcast if recent
+          const top = dbAnnouncements[0];
+          const dismissedId = localStorage.getItem('edtech_dismissed_dashboard_broadcast');
+          if (top && dismissedId !== top.id?.toString()) {
+            setLatestBroadcast(top);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load dashboard metrics from database:', err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
-    loadDashboardMetrics();
 
-    // Real-time BroadcastChannel sync
+    void loadDashboardMetrics();
+
+    // BroadcastChannel sync
     let bc = null;
-    if (typeof BroadcastChannel !== 'undefined') {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       try {
         bc = new BroadcastChannel('edtech_platform_sync');
         bc.onmessage = (e) => {
@@ -93,7 +103,9 @@ export default function Dashboard() {
             });
           }
         };
-      } catch (err) {}
+      } catch {
+        // BroadcastChannel unavailable
+      }
     }
 
     const sub = supabase.channel('admin_dashboard_broadcasts')

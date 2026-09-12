@@ -1,5 +1,6 @@
 import React from 'react';
 import { SUPABASE_CONFIG } from '../constants.js';
+import { supabase } from '../supabase.js';
 import { StatBox } from '../components/SharedComponents.jsx';
 
 export function SystemHealthView({ auditLogs, classes, users, orgs, isLogsLoading, onResolveIncident, onClearAllIncidents, onLogIncident, onRefreshLogs }) {
@@ -45,8 +46,8 @@ export function SystemHealthView({ auditLogs, classes, users, orgs, isLogsLoadin
         },
         r2: {
           bucket: 'edtechplatform',
-          accountId: '21b75f7da0ec0dde4d08d3f19d2102f3',
-          endpoint: '21b75f7da0ec0dde4d08d3f19d2102f3.r2.cloudflarestorage.com',
+          accountId: '••••••••••••••••••••••••••••••••',
+          endpoint: '••••••••••••••••.r2.cloudflarestorage.com',
           publicDomain: 'pub-670b98370fe642a2be08ee37cbfd385f.r2.dev',
           storageUsedMb: 0.00,
           storageLimitGb: 10.00,
@@ -59,18 +60,22 @@ export function SystemHealthView({ auditLogs, classes, users, orgs, isLogsLoadin
         isSyncing: false
       });
 
-      // Real live ping test to Supabase REST API
+      // Real live ping test to Supabase REST API (anonymous apikey ping or authenticated bearer)
       const pingSupabaseRest = async () => {
         setIsPinging(true);
         const start = performance.now();
         try {
-          const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/classes?select=id&limit=1`, {
-            headers: { 'apikey': SUPABASE_CONFIG.key, 'Authorization': `Bearer ${SUPABASE_CONFIG.key}` }
-          });
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          const headers = { 'apikey': SUPABASE_CONFIG.key };
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+          await fetch(`${SUPABASE_CONFIG.url}/rest/v1/classes?select=id&limit=1`, { headers });
           const duration = Math.round(performance.now() - start);
           setLiveLatency(prev => ({ ...prev, restMs: duration || 18 }));
           return duration || 18;
-        } catch (e) {
+        } catch {
           const duration = Math.round(performance.now() - start);
           setLiveLatency(prev => ({ ...prev, restMs: duration || 45 }));
           return duration || 45;
@@ -87,11 +92,10 @@ export function SystemHealthView({ auditLogs, classes, users, orgs, isLogsLoadin
           let extraBytes = 0;
 
           try {
-            const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/messages?select=media_url`, {
-              headers: { 'apikey': SUPABASE_CONFIG.key, 'Authorization': `Bearer ${SUPABASE_CONFIG.key}` }
-            });
-            const data = await res.json();
-            if (Array.isArray(data)) {
+            const { data, error } = await supabase.from('messages').select('media_url');
+            if (error) {
+              console.warn("Could not query messages table via supabase client:", error.message);
+            } else if (Array.isArray(data)) {
               const r2Files = data.filter(m => m && m.media_url && typeof m.media_url === 'string' && m.media_url.includes('r2.dev'));
               r2Count = r2Files.length;
               extraBytes = r2Files.length * 280 * 1024;
@@ -118,14 +122,22 @@ export function SystemHealthView({ auditLogs, classes, users, orgs, isLogsLoadin
             lastSynced: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
             isSyncing: false
           }));
-        } catch (e) {
+        } catch {
           setCloudStorage(prev => ({ ...prev, isSyncing: false }));
         }
       };
 
       React.useEffect(() => {
-        pingSupabaseRest();
-        syncLiveCloudStorage();
+        let isMounted = true;
+        const timer = setTimeout(() => {
+          if (isMounted) {
+            syncLiveCloudStorage();
+          }
+        }, 0);
+        return () => {
+          isMounted = false;
+          clearTimeout(timer);
+        };
       }, []);
 
       // ── RUN DEEP PLATFORM DIAGNOSTIC & SECURITY SCAN ──
@@ -159,8 +171,6 @@ export function SystemHealthView({ auditLogs, classes, users, orgs, isLogsLoadin
         setScanStep('Scanning 10 Classes, Curriculum Subject Matrices & Faculty Bindings...');
         
         let emptyClassesCount = 0;
-        let missingCTCount = 0;
-        let orphanStudentPointers = 0;
 
         classes.forEach(c => {
           // Check curriculum format
@@ -196,7 +206,6 @@ export function SystemHealthView({ auditLogs, classes, users, orgs, isLogsLoadin
           if (c.teachers && c.teachers.length > 0) {
             const hasCT = c.teachers.some(t => t.isClassTeacher);
             if (!hasCT) {
-              missingCTCount++;
               findings.push({
                 id: `diag-struct-ct-${c.id}`,
                 category: 'STRUCTURE',
@@ -216,7 +225,6 @@ export function SystemHealthView({ auditLogs, classes, users, orgs, isLogsLoadin
             c.studentEmails.forEach(email => {
               const userExists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
               if (!userExists) {
-                orphanStudentPointers++;
                 findings.push({
                   id: `diag-struct-orphan-${c.id}-${email}`,
                   category: 'STRUCTURE',
@@ -282,7 +290,7 @@ export function SystemHealthView({ auditLogs, classes, users, orgs, isLogsLoadin
           const em = u.email.toLowerCase();
           emailCounts[em] = (emailCounts[em] || 0) + 1;
         });
-        const duplicates = Object.entries(emailCounts).filter(([_, count]) => count > 1);
+        const duplicates = Object.entries(emailCounts).filter(([, count]) => count > 1);
         if (duplicates.length === 0) {
           findings.push({
             id: 'diag-copy-users-clean',
@@ -314,14 +322,15 @@ export function SystemHealthView({ auditLogs, classes, users, orgs, isLogsLoadin
 
         // Verify SuperAdmin isolation
         const superAdmins = users.filter(u => u.role === 'SUPER_ADMIN');
-        if (superAdmins.length === 1 && superAdmins[0].email === 'urvashinath0409@gmail.com') {
+        const rootAdminEmail = superAdmins[0]?.email || 'Root Admin';
+        if (superAdmins.length === 1) {
           findings.push({
             id: 'diag-sec-superadmin-clean',
             category: 'SECURITY',
             severity: 'HEALTHY',
             title: `SuperAdmin Role Isolation Verified`,
-            details: `Only 1 authorized SuperAdmin account (${CURRENT_SUPER_ADMIN.email}) holds root privileges. No privilege escalation detected.`,
-            affectedNode: CURRENT_SUPER_ADMIN.email,
+            details: `Only 1 authorized SuperAdmin account (${rootAdminEmail}) holds root privileges. No privilege escalation detected.`,
+            affectedNode: rootAdminEmail,
             canAutoFix: false
           });
         } else {
@@ -407,7 +416,6 @@ export function SystemHealthView({ auditLogs, classes, users, orgs, isLogsLoadin
           title: `Deep Platform Diagnostic Executed (Health Score: ${healthScore}%)`,
           details: `Scanned ${diagnosticReport.totalNodesScanned} nodes across classes, users, security policies and duplicate detection. ${findings.length} total findings generated.`,
           source: 'Deep Diagnostic Engine',
-          actor_email: CURRENT_SUPER_ADMIN.email,
           status: 'RESOLVED',
           metadata: { healthScore, findingsCount: findings.length }
         });
@@ -468,7 +476,6 @@ export function SystemHealthView({ auditLogs, classes, users, orgs, isLogsLoadin
           title: newIncidentForm.title,
           details: newIncidentForm.details,
           source: newIncidentForm.source,
-          actor_email: newIncidentForm.actor_email || CURRENT_SUPER_ADMIN.email,
           status: 'ACTIVE'
         });
         setShowLogModal(false);

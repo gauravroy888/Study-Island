@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Card from '../components/Card';
-import { Video, Calendar as CalendarIcon, Clock, Play, FileText, CheckCircle, ExternalLink, Loader2, Award } from 'lucide-react';
+import { Video, Play, FileText, Award } from 'lucide-react';
 import { supabase } from '../supabase';
 import TestRunnerModal from '../components/TestRunnerModal';
 import './LiveClass.css';
@@ -10,7 +10,6 @@ export default function LiveClass() {
   const [activeLiveClass, setActiveLiveClass] = useState(null);
   const [upcomingClasses, setUpcomingClasses] = useState([]);
   const [testsList, setTestsList] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [runningTest, setRunningTest] = useState(null);
   const [completedResults, setCompletedResults] = useState(() => {
     try {
@@ -20,27 +19,7 @@ export default function LiveClass() {
     }
   });
 
-  useEffect(() => {
-    fetchLiveData();
-    
-    // Subscribe to real-time changes in live_classes and tests tables
-    const channel = supabase
-      .channel('public:live_classes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_classes' }, () => {
-        fetchLiveData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tests' }, () => {
-        fetchLiveData();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const fetchLiveData = async () => {
-    setIsLoading(true);
+  const fetchLiveData = useCallback(async () => {
     try {
       // 1. Fetch currently active live class
       const { data: activeData } = await supabase
@@ -77,10 +56,32 @@ export default function LiveClass() {
       }
     } catch (err) {
       console.error('Error fetching live data:', err);
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await fetchLiveData();
+    };
+    void init();
+
+    // Subscribe to real-time changes in live_classes and tests tables
+    const channel = supabase
+      .channel('public:live_classes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_classes' }, () => {
+        if (isMounted) fetchLiveData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tests' }, () => {
+        if (isMounted) fetchLiveData();
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [fetchLiveData]);
 
   return (
     <div className="view-container" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

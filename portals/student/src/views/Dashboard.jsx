@@ -11,8 +11,25 @@ export default function Dashboard() {
   const userName = user?.name || 'Student';
   const [latestBroadcast, setLatestBroadcast] = useState(null);
 
+  const loadLatestBroadcast = React.useCallback(async () => {
+    try {
+      const { data } = await supabase.from('announcements').select('*').order('createdAt', { ascending: false }).limit(1);
+      if (data && data.length > 0) {
+        const bcast = data[0];
+        const dismissedId = localStorage.getItem('edtech_dismissed_dashboard_broadcast');
+        if (dismissedId !== (bcast.id?.toString() || bcast.title)) {
+          setLatestBroadcast(bcast);
+        }
+      }
+    } catch { /* ignore load error */ }
+  }, []);
+
   useEffect(() => {
-    loadLatestBroadcast();
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await loadLatestBroadcast();
+    };
+    void init();
 
     // Real-time BroadcastChannel sync
     let bc = null;
@@ -29,35 +46,23 @@ export default function Dashboard() {
             });
           }
         };
-      } catch (err) {}
+      } catch { /* ignore BroadcastChannel error */ }
     }
 
     const sub = supabase.channel('student_dashboard_broadcasts')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, (payload) => {
-        if (payload.new) {
+        if (payload.new && isMounted) {
           setLatestBroadcast(payload.new);
         }
       })
       .subscribe();
 
     return () => {
+      isMounted = false;
       if (bc) bc.close();
       supabase.removeChannel(sub);
     };
-  }, []);
-
-  async function loadLatestBroadcast() {
-    try {
-      const { data } = await supabase.from('announcements').select('*').order('createdAt', { ascending: false }).limit(1);
-      if (data && data.length > 0) {
-        const bcast = data[0];
-        const dismissedId = localStorage.getItem('edtech_dismissed_dashboard_broadcast');
-        if (dismissedId !== (bcast.id?.toString() || bcast.title)) {
-          setLatestBroadcast(bcast);
-        }
-      }
-    } catch (e) {}
-  }
+  }, [loadLatestBroadcast]);
 
   const handleDismissDashboardBroadcast = () => {
     if (latestBroadcast) {

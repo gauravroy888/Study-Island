@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Card from '../components/Card';
 import { Check, Trash2, Plus } from 'lucide-react';
 import { supabase } from '../supabase';
@@ -8,11 +8,7 @@ export default function ToDoList() {
   const [newTask, setNewTask] = useState('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     setLoading(true);
     const local = localStorage.getItem('edtech_teacher_todos');
     let initialTasks = local ? JSON.parse(local) : [
@@ -27,11 +23,20 @@ export default function ToDoList() {
       if (!error && data && data.length > 0) {
         initialTasks = data.map(t => ({ id: t.id, text: t.task || t.text, completed: !!t.completed }));
       }
-    } catch (e) {}
+    } catch { /* ignore */ }
 
     setTasks(initialTasks);
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await fetchTasks();
+    };
+    void init();
+    return () => { isMounted = false; };
+  }, [fetchTasks]);
 
   const saveTasks = (updatedTasks) => {
     setTasks(updatedTasks);
@@ -46,7 +51,7 @@ export default function ToDoList() {
     if (target && typeof id === 'string') {
       try {
         await supabase.from('todos').update({ completed: target.completed }).eq('id', id);
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
   };
 
@@ -60,7 +65,7 @@ export default function ToDoList() {
 
       try {
         await supabase.from('todos').insert([{ text: taskObj.text, completed: false, created_at: new Date().toISOString() }]);
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
   };
 
@@ -71,7 +76,7 @@ export default function ToDoList() {
     if (typeof id === 'string') {
       try {
         await supabase.from('todos').delete().eq('id', id);
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
   };
 

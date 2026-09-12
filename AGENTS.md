@@ -1,6 +1,6 @@
 # EdTech Island — Project Guidelines & Governance
 
-> **PRIMARY GOVERNANCE:** All agents must read and strictly obey [`EDTECH_ISLAND_AI_ENGINEERING_CONSTITUTION.md`](./EDTECH_ISLAND_AI_ENGINEERING_CONSTITUTION.md) and [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md).
+> **PRIMARY GOVERNANCE:** All agents must read and strictly obey [`docs/EDTECH_ISLAND_AI_ENGINEERING_CONSTITUTION.md`](./docs/EDTECH_ISLAND_AI_ENGINEERING_CONSTITUTION.md), [`docs/PROJECT_CONTEXT.md`](./docs/PROJECT_CONTEXT.md), and [`docs/AGENTS.md`](./docs/AGENTS.md).
 
 ## 🚫 Git Push Policy (STRICT & PERMANENT)
 - **NEVER** run `git push` or push changes to GitHub or any remote repository automatically.
@@ -18,4 +18,12 @@
 - **Live Web Verification Rule (Never Rely on Outdated Training Memory):** When dealing with evolving specifications, API key formats, model endpoints/names, external SDKs, shortcuts, or framework features, ALWAYS perform a live web search or documentation check before making assertions, diagnosing errors, or writing code. Never assume legacy constraints (such as old key prefix assumptions or deprecated model tags) apply without live verification.
 - **Single AI Bot Singleton:** Maintain strictly one Aria AI widget per page session with deep `iframe` / route inspection (`getScreenContent()`).
 - **Evidence & Analytics Pipeline:** Historical telemetry is immutable; never mutate raw analytics events or change versioned mastery formulas without explicit approval.
-- **Verification Gate:** Always verify builds (`npm run build:study-island`, `npm run build:student`) and live endpoints before reporting completion. Never claim success without verification.
+- **Verification Gate:** Always verify builds (`cmd /c npm run build` in study-island, portals/student, portals/teacher) and live endpoints before reporting completion. Never claim success without verification.
+- **Mandatory Post-Task Independent Audit Gate (STRICT & PERMANENT):** Whenever any task, feature, bug fix, or refactor is completed, ALWAYS start an independent audit agent in the end to check if it's done perfectly, correctly, or not.
+
+## 🕵️‍♂️ Post-Task Audit Protocol
+Every task completion MUST end with spawning/running an independent Audit Agent:
+1. Review all modified and newly created files for defects, syntax errors, scale discrepancies, or unhandled edge cases.
+2. Run build verification across affected workspaces (`cmd /c npm run build`).
+3. Verify live DB schema, RLS policies, and telemetry payloads against expected contracts.
+4. Provide an objective, unvarnished audit verdict (PASS / FAIL) before final sign-off.

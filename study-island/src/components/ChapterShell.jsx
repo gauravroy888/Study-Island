@@ -1,5 +1,4 @@
-﻿import React, { useState } from "react";
-import AITutorWidget from "./AITutorWidget";
+import React, { useState } from "react";
 
 const TABS = [
   { id: "experience",    label: "Experience",    icon: "­ƒÆí" },
@@ -78,9 +77,6 @@ export default function ChapterShell({ chapter, studentContext, children }) {
             : child
         )}
       </main>
-
-      {/* ÔöÇÔöÇ Aria AI Tutor Bot Widget ÔöÇÔöÇ */}
-      <AITutorWidget />
     </div>
   );
 }

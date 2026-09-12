@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, MapPin, Clock, Users, Tag, Filter, CheckCircle2, ChevronRight, X, Loader2, AlertCircle, Volume2, Trash2, Edit3, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Calendar, Plus, MapPin, Clock, CheckCircle2, ChevronRight, X, Loader2, AlertCircle, Volume2, Trash2, Edit3, AlertTriangle } from 'lucide-react';
 import Card from '../components/Card';
 import { supabase } from '../supabase';
 
@@ -29,6 +29,10 @@ export default function Events() {
         .from('announcements')
         .select('*')
         .order('createdAt', { ascending: false });
+
+      if (annErr) {
+        console.warn('Announcements fetch note:', annErr.message);
+      }
 
       // 2. Fetch from live_classes table
       const { data: dbLiveClasses } = await supabase
@@ -63,7 +67,7 @@ export default function Events() {
       }
 
       if (dbLiveClasses && dbLiveClasses.length > 0) {
-        dbLiveClasses.forEach((lc, idx) => {
+        dbLiveClasses.forEach((lc) => {
           combined.push({
             id: lc.id,
             title: lc.title || 'Live 3D Classroom Session',
@@ -92,7 +96,14 @@ export default function Events() {
   };
 
   useEffect(() => {
-    loadDatabaseEvents();
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await loadDatabaseEvents();
+    };
+    void init();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const filteredEvents = events.filter(e => {

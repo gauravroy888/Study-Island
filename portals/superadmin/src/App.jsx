@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from './supabase.js';
 import { SUPABASE_CONFIG, INITIAL_USERS, INITIAL_ORGS, DPS_INSTITUTION, DEFAULT_CLASSES } from './constants.js';
 
 import { SidebarButton } from './components/SidebarButton.jsx';
@@ -15,24 +16,14 @@ import { CourseCurriculumView }   from './views/CourseCurriculumView.jsx';
 import { CustomCoursesView }      from './views/CustomCoursesView.jsx';
 import { SuperAdminProfilePhotoModal } from './modals/ProfilePhotoModal.jsx';
 
-// ── Resolve Super Admin identity from authenticated edtech_user ──
-const _authUser = (() => { try { return JSON.parse(localStorage.getItem('edtech_user') || 'null'); } catch(e) { return null; } })();
-const CURRENT_SUPER_ADMIN = {
-  name:   _authUser?.name   || "Urvashi Nath",
-  email:  _authUser?.email  || "urvashinath0409@gmail.com",
-  role:   "Super Admin",
-  avatar: _authUser?.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(_authUser?.name || 'UrvashiNath')}`,
-};
-
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('edtech_user') || 'null'); } catch (e) { return null; }
-  });
+  const [currentUser, setCurrentUser]       = useState(null);
+  const [authSession, setAuthSession]       = useState(null);
   const [authChecking, setAuthChecking]     = useState(true);
   const [activeTab, setActiveTab]           = useState("users");
   const [users, setUsers]                   = useState(INITIAL_USERS);
   const [orgs, setOrgs]                     = useState(INITIAL_ORGS);
-  const [classes, setClasses]               = useState(DEFAULT_CLASSES);
+  const [classes]                           = useState(DEFAULT_CLASSES);
   const [auditLogs, setAuditLogs]           = useState([]);
   const [searchTerm, setSearchTerm]         = useState("");
   const [impersonatedUser, setImpersonatedUser]   = useState(null);
@@ -49,176 +40,382 @@ export default function App() {
     maintenanceSplash: false,
   });
 
-  // ── Session resolution ──
+  // ── Session resolution: Derived solely from real Supabase session ──
   useEffect(() => {
+    let mounted = true;
     const resolveSession = async () => {
       try {
-        let user = currentUser;
-        if (!user || !user.email) {
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-              try {
-                const td = JSON.parse(localStorage.getItem(key));
-                if (td && td.user) {
-                  user = { uid: td.user.id, email: td.user.email, name: td.user.user_metadata?.full_name || td.user.email?.split('@')[0], avatar_url: td.user.user_metadata?.avatar_url };
-                  break;
-                }
-              } catch (e) {}
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session || !session.user) {
+          if (mounted) {
+            setCurrentUser(null);
+            setAuthSession(null);
+            setAuthChecking(false);
+          }
+          return;
+        }
+
+        if (mounted) setAuthSession(session);
+
+        // Fetch verified profile using authenticated user's access token
+        const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/profiles?auth_id=eq.${encodeURIComponent(session.user.id)}&select=id,auth_id,email,name,role,avatar_url`, {
+          headers: {
+            apikey: SUPABASE_CONFIG.key,
+            Authorization: `Bearer ${session.access_token}`
+          },
+        });
+
+        if (res.ok) {
+          const profList = await res.json();
+          if (Array.isArray(profList) && profList.length > 0) {
+            const p = profList[0];
+            const role = (p.role || '').toLowerCase();
+            if (role === 'super_admin' || role === 'superadmin') {
+              if (mounted) {
+                const superUser = {
+                  uid: p.auth_id || session.user.id,
+                  email: p.email || session.user.email,
+                  name: p.name || 'Super Admin',
+                  role: 'super_admin',
+                  avatar_url: p.avatar_url || `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(p.name || 'SuperAdmin')}`
+                };
+                setCurrentUser(superUser);
+                localStorage.setItem('edtech_user', JSON.stringify(superUser));
+              }
+            } else {
+              if (mounted) setCurrentUser({ role: p.role });
             }
           }
-        }
-        if (user && user.email) {
-          try {
-            const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/profiles?email=eq.${encodeURIComponent(user.email.toLowerCase())}`, {
-              headers: { apikey: SUPABASE_CONFIG.key, Authorization: `Bearer ${SUPABASE_CONFIG.key}` },
-            });
-            const profList = await res.json();
-            if (Array.isArray(profList) && profList.length > 0) {
-              const p = profList[0];
-              user = { uid: p.auth_id || user.uid, email: p.email, name: p.name || user.name || 'Super Admin', role: p.role, avatar_url: p.avatar_url || user.avatar_url };
-            }
-          } catch (e) {}
-        }
-        const userEmail = (user?.email || '').toLowerCase();
-        const isRootEmail = userEmail === 'urvashinath0409@gmail.com';
-        if (isRootEmail) {
-          user = { uid: user?.uid || 'super-admin-root', email: 'urvashinath0409@gmail.com', name: user?.name || CURRENT_SUPER_ADMIN.name, role: 'super_admin', avatar_url: user?.avatar_url || CURRENT_SUPER_ADMIN.avatar };
-        }
-        if (user && (user.role === 'super_admin' || user.role === 'superadmin' || isRootEmail)) {
-          setCurrentUser(user);
-          localStorage.setItem('edtech_user', JSON.stringify(user));
-          if (user.avatar_url) localStorage.setItem('portal_avatar', user.avatar_url);
-          if (user.name) localStorage.setItem('portal_name', user.name);
-        } else if (user) {
-          setCurrentUser(user);
         }
       } catch (err) {
         console.error('Session resolution error:', err);
       } finally {
-        setAuthChecking(false);
+        if (mounted) setAuthChecking(false);
       }
     };
+
     resolveSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        setCurrentUser(null);
+        setAuthSession(null);
+      } else {
+        resolveSession();
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe();
+    };
   }, []);
 
-  // ── Audit log fetchers ──
+  // ── Audit log fetchers (Authenticated & Secured via RLS & RPC) ──
   const fetchLiveAuditLogs = async () => {
     try {
       setIsLogsLoading(true);
-      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/system_audit_logs?select=*&order=created_at.desc`, {
-        headers: { apikey: SUPABASE_CONFIG.key, Authorization: `Bearer ${SUPABASE_CONFIG.key}` },
-      });
-      const data = await res.json();
-      if (Array.isArray(data)) setAuditLogs(data);
-    } catch (e) { console.warn("Failed to fetch audit logs:", e); }
-    finally { setIsLogsLoading(false); }
+      const { data, error } = await supabase
+        .from('system_audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data)) {
+        setAuditLogs(data);
+      } else if (error) {
+        console.warn("Failed to fetch audit logs via supabase client:", error.message);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch audit logs:", e);
+    } finally {
+      setIsLogsLoading(false);
+    }
   };
 
   const logPlatformIncident = async (logData) => {
     try {
-      const payload = {
-        severity: logData.severity || 'INFO', category: logData.category || 'SYSTEM',
-        code: logData.code || 200, title: logData.title, details: logData.details || '',
-        source: logData.source || 'SuperAdmin Portal', actor_email: logData.actor_email || CURRENT_SUPER_ADMIN.email,
-        school_id: logData.school_id || 'inst-dps-001', status: logData.status || 'ACTIVE', metadata: logData.metadata || {},
-      };
-      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/system_audit_logs`, {
-        method: 'POST',
-        headers: { apikey: SUPABASE_CONFIG.key, Authorization: `Bearer ${SUPABASE_CONFIG.key}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-        body: JSON.stringify(payload),
+      const derivedSchoolId = logData.school_id || currentUser?.department || currentUser?.institution_id || null;
+
+      // 1. Try secure RPC log_system_audit_event
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('log_system_audit_event', {
+        p_severity: logData.severity || 'INFO',
+        p_category: logData.category || 'SYSTEM',
+        p_code: logData.code || 200,
+        p_title: logData.title,
+        p_details: logData.details || '',
+        p_source: logData.source || 'SuperAdmin Portal',
+        p_school_id: derivedSchoolId,
+        p_status: logData.status || 'ACTIVE',
+        p_metadata: logData.metadata || {}
       });
-      const inserted = await res.json();
-      if (Array.isArray(inserted) && inserted.length > 0) setAuditLogs(prev => [inserted[0], ...prev]);
-      else fetchLiveAuditLogs();
-    } catch (e) { console.error("Failed to insert incident:", e); }
+
+      if (!rpcErr && rpcData) {
+        setAuditLogs(prev => [rpcData, ...prev]);
+        return;
+      }
+
+      if (rpcErr) {
+        console.warn("RPC log_system_audit_event error:", rpcErr.message);
+      }
+
+      // 2. Fallback: call backend server /api/audit-log with authenticated session
+      if (authSession?.access_token) {
+        const res = await fetch('/api/audit-log', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authSession.access_token}`
+          },
+          body: JSON.stringify({
+            severity: logData.severity || 'INFO',
+            category: logData.category || 'SYSTEM',
+            code: logData.code || 200,
+            title: logData.title,
+            details: logData.details || '',
+            source: logData.source || 'SuperAdmin Portal',
+            school_id: derivedSchoolId,
+            status: logData.status || 'ACTIVE',
+            metadata: logData.metadata || {}
+          })
+        });
+        const respData = await res.json().catch(() => null);
+        if (respData && respData.ok && respData.data) {
+          setAuditLogs(prev => [respData.data, ...prev]);
+          return;
+        }
+      }
+
+      fetchLiveAuditLogs();
+    } catch (e) {
+      console.error("Failed to record incident:", e);
+    }
   };
 
   const handleResolveIncident = async (id) => {
     try {
-      await fetch(`${SUPABASE_CONFIG.url}/rest/v1/system_audit_logs?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: { apikey: SUPABASE_CONFIG.key, Authorization: `Bearer ${SUPABASE_CONFIG.key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'RESOLVED' }),
+      // 1. Try secure RPC resolve_system_audit_incident
+      const { error: rpcErr } = await supabase.rpc('resolve_system_audit_incident', {
+        p_incident_id: id,
+        p_new_status: 'RESOLVED'
       });
-      setAuditLogs(prev => prev.map(l => l.id === id ? { ...l, status: 'RESOLVED' } : l));
-    } catch (e) { console.error("Failed to resolve incident:", e); }
+
+      if (!rpcErr) {
+        setAuditLogs(prev => prev.map(l => l.id === id ? { ...l, status: 'RESOLVED' } : l));
+        return;
+      }
+
+      // 2. Fallback: call backend server /api/superadmin/incidents/resolve
+      if (authSession?.access_token) {
+        const res = await fetch('/api/superadmin/incidents/resolve', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authSession.access_token}`
+          },
+          body: JSON.stringify({ id, status: 'RESOLVED' })
+        });
+        const data = await res.json().catch(() => null);
+        if (data && data.ok) {
+          setAuditLogs(prev => prev.map(l => l.id === id ? { ...l, status: 'RESOLVED' } : l));
+          return;
+        }
+      }
+
+      console.error("Resolve incident error:", rpcErr?.message);
+    } catch (e) {
+      console.error("Failed to resolve incident:", e);
+    }
   };
 
   const handleClearAllIncidents = async () => {
     try {
       const activeIds = auditLogs.filter(l => l.status === 'ACTIVE').map(l => l.id);
-      for (const id of activeIds) {
-        await fetch(`${SUPABASE_CONFIG.url}/rest/v1/system_audit_logs?id=eq.${id}`, {
-          method: 'PATCH',
-          headers: { apikey: SUPABASE_CONFIG.key, Authorization: `Bearer ${SUPABASE_CONFIG.key}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'RESOLVED' }),
-        });
-      }
-      setAuditLogs(prev => prev.map(l => ({ ...l, status: 'RESOLVED' })));
-    } catch (e) { console.error("Failed to clear all:", e); }
+      if (activeIds.length === 0) return;
+
+      await Promise.allSettled(activeIds.map(id => handleResolveIncident(id)));
+      fetchLiveAuditLogs();
+    } catch (e) {
+      console.error("Failed to clear all incidents:", e);
+    }
   };
 
-  // ── Load users + org from Supabase ──
+  // ── Load users + org from Supabase via authenticated session ──
   useEffect(() => {
     async function loadSupabaseUsers() {
+      if (!authSession?.access_token) return;
       try {
-        const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/users?select=*`, {
-          headers: { apikey: SUPABASE_CONFIG.key, Authorization: `Bearer ${SUPABASE_CONFIG.key}` },
+        const res = await fetch('/api/superadmin/users', {
+          headers: { Authorization: `Bearer ${authSession.access_token}` },
         });
-        const dbUsers = await res.json();
-        if (Array.isArray(dbUsers) && dbUsers.length > 0) {
-          const mapped = dbUsers
-            .filter(u => u.email !== 'gauravroy76@gmail.com')
-            .map(u => ({ id: u.id, name: u.full_name || u.email.split('@')[0], email: u.email, role: (u.role || 'STUDENT').toUpperCase(), status: u.status || 'Active', institution_id: 'inst-dps-001', org: 'Delhi Public School', joined: (u.created_at || '').slice(0, 10) || '2026-05-27' }));
-          if (!mapped.some(u => u.email === 'immersionlabsindia@gmail.com')) mapped.push({ id: 'usr-immersion', name: 'Immersion Labs', email: 'immersionlabsindia@gmail.com', role: 'ADMIN', status: 'Active', institution_id: 'inst-dps-001', org: 'Delhi Public School', joined: '2026-05-20' });
-          if (!mapped.some(u => u.email === 'thorroy888@gmail.com')) mapped.push({ id: 'usr-thorroy', name: 'GAURAV Roy', email: 'thorroy888@gmail.com', role: 'STUDENT', status: 'Active', institution_id: 'inst-dps-001', org: 'Delhi Public School', joined: '2026-05-27' });
-          if (!mapped.some(u => u.email === 'sauravroy469@gmail.com')) mapped.push({ id: 'usr-saurav', name: 'Saurav Roy', email: 'sauravroy469@gmail.com', role: 'STUDENT', status: 'Active', institution_id: 'inst-dps-001', org: 'Delhi Public School', joined: '2026-06-15' });
-          const superAdmin = { id: 'usr-super', name: 'Urvashi Nath', email: 'urvashinath0409@gmail.com', role: 'SUPER_ADMIN', status: 'Active', institution_id: null, org: '—', joined: '2026-08-01' };
-          setUsers([superAdmin, ...mapped]);
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.users)) {
+          const mapped = data.users.map(u => ({
+            id: u.id,
+            name: u.name || u.email?.split('@')[0] || 'User',
+            email: u.email,
+            role: (u.role || 'STUDENT').toUpperCase(),
+            status: u.status || 'Active',
+            institution_id: u.institution_id || u.department || null,
+            org: u.org_name || u.department || 'General',
+            joined: (u.created_at || '').slice(0, 10) || new Date().toISOString().slice(0, 10)
+          }));
+          setUsers(mapped);
+
           const realStudents = mapped.filter(u => u.role === 'STUDENT').length;
           const realTeachers = mapped.filter(u => u.role === 'TEACHER').length;
           try {
-            const brandRes = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/school_branding?institution_id=eq.inst-dps-001&limit=1`, { headers: { apikey: SUPABASE_CONFIG.key, Authorization: `Bearer ${SUPABASE_CONFIG.key}` } });
+            const brandRes = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/school_branding?limit=1`, {
+              headers: { apikey: SUPABASE_CONFIG.key, Authorization: `Bearer ${authSession.access_token}` }
+            });
             const brandData = await brandRes.json();
             if (brandData && brandData[0]) {
               const b = brandData[0];
               setOrgs([{ ...DPS_INSTITUTION, name: b.school_name || DPS_INSTITUTION.name, logo_url: b.logo_url, primary_color: b.primary_color, theme_preset: b.theme_preset, students: realStudents, teachers: realTeachers }]);
-            } else { setOrgs([{ ...DPS_INSTITUTION, students: realStudents, teachers: realTeachers }]); }
-          } catch { setOrgs([{ ...DPS_INSTITUTION, students: realStudents, teachers: realTeachers }]); }
+            } else {
+              setOrgs([{ ...DPS_INSTITUTION, students: realStudents, teachers: realTeachers }]);
+            }
+          } catch {
+            setOrgs([{ ...DPS_INSTITUTION, students: realStudents, teachers: realTeachers }]);
+          }
         }
-      } catch (e) { console.warn("Live Supabase fetch error, using fallback:", e); }
+      } catch (e) {
+        console.warn("Live user fetch error:", e);
+      }
     }
-    loadSupabaseUsers();
-    fetchLiveAuditLogs();
-  }, []);
 
-  // ── Role & status handlers ──
+    if (currentUser?.role === 'super_admin') {
+      const timer = setTimeout(() => {
+        loadSupabaseUsers();
+        fetchLiveAuditLogs();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [authSession, currentUser]);
+
+  // ── Role & status handlers (routed through backend server endpoint) ──
   const handleRoleChange = async (userId, newRole) => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
     const targetUser = users.find(u => u.id === userId);
-    if (!targetUser) return;
+    if (!targetUser || !authSession?.access_token) return;
+
+    // Guard: Prevent self-demotion in UI
+    const isSelf = (currentUser?.uid && targetUser.auth_id === currentUser.uid) || targetUser.email === currentUser?.email;
+    if (isSelf && newRole !== 'SUPER_ADMIN') {
+      alert('Self-demotion is forbidden. SuperAdmins cannot remove their own SuperAdmin role.');
+      return;
+    }
+
+    // Guard: Prevent demoting the final SuperAdmin in UI
+    const activeSuperAdmins = users.filter(u => u.role === 'SUPER_ADMIN' && u.status === 'Active');
+    if (targetUser.role === 'SUPER_ADMIN' && newRole !== 'SUPER_ADMIN' && activeSuperAdmins.length <= 1) {
+      alert('Cannot demote the final SuperAdmin: at least one active SuperAdmin must remain.');
+      return;
+    }
+
+    const prevRole = targetUser.role;
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+
     try {
-      await fetch(`${SUPABASE_CONFIG.url}/rest/v1/profiles?email=eq.${encodeURIComponent(targetUser.email)}`, {
-        method: 'PATCH', headers: { apikey: SUPABASE_CONFIG.key, Authorization: `Bearer ${SUPABASE_CONFIG.key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ role: newRole.toLowerCase() }),
+      const resp = await fetch('/api/superadmin/users/role', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: targetUser.id,
+          email: targetUser.email,
+          role: newRole.toLowerCase()
+        }),
       });
-    } catch (e) { console.error('Role persist failed:', e); }
-    logPlatformIncident({ severity: newRole === 'SUPER_ADMIN' ? 'SECURITY' : 'INFO', category: 'SECURITY', code: 200, title: `Role Modification: ${targetUser.email} → ${newRole}`, details: `SuperAdmin updated role for ${targetUser.name} to ${newRole}.`, source: 'User Management Console', actor_email: CURRENT_SUPER_ADMIN.email, status: 'RESOLVED' });
+
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data?.ok) {
+        // Roll back optimistic UI update
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: prevRole } : u));
+        alert(`Role update failed: ${data?.error || 'Downstream server error'}`);
+        return;
+      }
+
+      // Record incident / audit entry strictly after verified success
+      logPlatformIncident({
+        severity: newRole === 'SUPER_ADMIN' ? 'SECURITY' : 'INFO',
+        category: 'SECURITY',
+        code: 200,
+        title: `Role Modification: ${targetUser.email} → ${newRole}`,
+        details: `SuperAdmin updated role for ${targetUser.name || targetUser.email} (ID: ${targetUser.id}) to ${newRole}.`,
+        source: 'User Management Console',
+        actor_email: currentUser?.email,
+        status: 'RESOLVED'
+      });
+    } catch (e) {
+      // Roll back optimistic UI update
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: prevRole } : u));
+      console.error('Role persist failed:', e);
+      alert(`Role update failed: ${e.message}`);
+    }
   };
 
   const handleStatusToggle = async (userId) => {
     const targetUser = users.find(u => u.id === userId);
-    if (!targetUser) return;
-    const nextStatus = targetUser.status === 'Active' ? 'Suspended' : 'Active';
+    if (!targetUser || !authSession?.access_token) return;
+
+    // Guard: Prevent self-suspension in UI
+    const isSelf = (currentUser?.uid && targetUser.auth_id === currentUser.uid) || targetUser.email === currentUser?.email;
+    if (isSelf && targetUser.status === 'Active') {
+      alert('Self-suspension is forbidden. SuperAdmins cannot suspend their own account.');
+      return;
+    }
+
+    // Guard: Prevent suspending the final SuperAdmin in UI
+    const activeSuperAdmins = users.filter(u => u.role === 'SUPER_ADMIN' && u.status === 'Active');
+    if (targetUser.role === 'SUPER_ADMIN' && targetUser.status === 'Active' && activeSuperAdmins.length <= 1) {
+      alert('Cannot suspend the final SuperAdmin: at least one active SuperAdmin must remain.');
+      return;
+    }
+
+    const prevStatus = targetUser.status;
+    const nextStatus = prevStatus === 'Active' ? 'Suspended' : 'Active';
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: nextStatus } : u));
+
     try {
-      await fetch(`${SUPABASE_CONFIG.url}/rest/v1/profiles?email=eq.${encodeURIComponent(targetUser.email)}`, {
-        method: 'PATCH', headers: { apikey: SUPABASE_CONFIG.key, Authorization: `Bearer ${SUPABASE_CONFIG.key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ status: nextStatus }),
+      const resp = await fetch('/api/superadmin/users/status', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: targetUser.id,
+          email: targetUser.email,
+          status: nextStatus
+        }),
       });
-    } catch (e) { setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: targetUser.status } : u)); }
-    logPlatformIncident({ severity: nextStatus === 'Suspended' ? 'WARNING' : 'INFO', category: 'SECURITY', code: nextStatus === 'Suspended' ? 403 : 200, title: `Account Status Changed: ${targetUser.email} → ${nextStatus}`, details: `Account ${nextStatus.toLowerCase()} by SuperAdmin.`, source: 'User Management Console', actor_email: CURRENT_SUPER_ADMIN.email, status: 'RESOLVED' });
+
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data?.ok) {
+        // Roll back optimistic UI update
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: prevStatus } : u));
+        alert(`Status update failed: ${data?.error || 'Downstream server error'}`);
+        return;
+      }
+
+      // Record incident / audit entry strictly after verified success
+      logPlatformIncident({
+        severity: nextStatus === 'Suspended' ? 'WARN' : 'INFO',
+        category: 'SECURITY',
+        code: nextStatus === 'Suspended' ? 403 : 200,
+        title: `Account Status Changed: ${targetUser.email} → ${nextStatus}`,
+        details: `Account ${nextStatus.toLowerCase()} by SuperAdmin for ${targetUser.name || targetUser.email} (ID: ${targetUser.id}).`,
+        source: 'User Management Console',
+        actor_email: currentUser?.email,
+        status: 'RESOLVED'
+      });
+    } catch (e) {
+      // Roll back optimistic UI update
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: prevStatus } : u));
+      console.error('Status persist failed:', e);
+      alert(`Status update failed: ${e.message}`);
+    }
   };
 
   const handleAddOrg = (e) => {
@@ -231,31 +428,56 @@ export default function App() {
   const handleBroadcast = async (e) => {
     e.preventDefault();
     const trimmedMsg = announcementText.trim();
-    if (!trimmedMsg) return;
-    const payload = { title: 'Platform Announcement', text: trimmedMsg, content: trimmedMsg, message: trimmedMsg, author: CURRENT_SUPER_ADMIN.name, author_name: CURRENT_SUPER_ADMIN.name, author_email: CURRENT_SUPER_ADMIN.email, category: 'Urgent', createdAt: new Date().toISOString() };
+    if (!trimmedMsg || !authSession?.access_token) return;
+
     try {
-      await fetch(`${SUPABASE_CONFIG.url}/rest/v1/notifications`, { method: 'POST', headers: { apikey: SUPABASE_CONFIG.key, Authorization: `Bearer ${SUPABASE_CONFIG.key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ user_email: 'all', type: 'system', title: 'Platform Announcement', message: trimmedMsg, is_read: false }) });
-      await fetch(`${SUPABASE_CONFIG.url}/rest/v1/announcements`, { method: 'POST', headers: { apikey: SUPABASE_CONFIG.key, Authorization: `Bearer ${SUPABASE_CONFIG.key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(payload) });
-      if (typeof BroadcastChannel !== 'undefined') { try { const bc = new BroadcastChannel('edtech_platform_sync'); bc.postMessage({ type: 'BROADCAST_ALERT', title: 'Platform Announcement', message: trimmedMsg, author: CURRENT_SUPER_ADMIN.name, timestamp: Date.now() }); bc.close(); } catch {} }
-      localStorage.setItem('edtech_active_broadcast', JSON.stringify({ id: `bcast_${Date.now()}`, title: 'Platform Announcement', message: trimmedMsg, author: CURRENT_SUPER_ADMIN.name, timestamp: Date.now() }));
+      const resp = await fetch('/api/superadmin/broadcast', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ message: trimmedMsg })
+      });
+
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data?.ok) {
+        alert(`Broadcast failed: ${data?.error || 'Failed to publish announcement'}`);
+        return;
+      }
+
+      // Synchronize across open platform tabs and persist broadcast strictly on verified success
+      if (typeof BroadcastChannel !== 'undefined') {
+        try {
+          const bc = new BroadcastChannel('edtech_platform_sync');
+          bc.postMessage({ type: 'BROADCAST_ALERT', title: 'Platform Announcement', message: trimmedMsg, author: currentUser?.name || 'SuperAdmin', timestamp: Date.now() });
+          bc.close();
+        } catch {}
+      }
+      localStorage.setItem('edtech_active_broadcast', JSON.stringify({ id: `bcast_${Date.now()}`, title: 'Platform Announcement', message: trimmedMsg, author: currentUser?.name || 'SuperAdmin', timestamp: Date.now() }));
       window.dispatchEvent(new Event('storage'));
-      logPlatformIncident({ severity: 'INFO', category: 'COMMUNICATION', code: 200, title: 'Platform Broadcast Sent', details: `"${trimmedMsg.slice(0, 80)}${trimmedMsg.length > 80 ? '...' : ''}"`, source: 'Broadcast Console', actor_email: CURRENT_SUPER_ADMIN.email, status: 'RESOLVED' });
-    } catch (err) { console.error('Broadcast failed:', err); }
-    setAnnouncementSent(true);
-    setTimeout(() => { setAnnouncementSent(false); setShowAnnounceModal(false); setAnnouncementText(""); }, 1500);
+
+      logPlatformIncident({
+        severity: 'INFO',
+        category: 'COMMUNICATION',
+        code: 200,
+        title: 'Platform Broadcast Sent',
+        details: `"${trimmedMsg.slice(0, 80)}${trimmedMsg.length > 80 ? '...' : ''}"`,
+        source: 'Broadcast Console',
+        actor_email: currentUser?.email,
+        status: 'RESOLVED'
+      });
+
+      setAnnouncementSent(true);
+      setTimeout(() => { setAnnouncementSent(false); setShowAnnounceModal(false); setAnnouncementText(""); }, 1500);
+    } catch (err) {
+      console.error('Broadcast failed:', err);
+      alert(`Broadcast failed: ${err.message}`);
+    }
   };
 
-  // ── Auth checks ──
-  const isSuperAdmin = currentUser && (currentUser.role === 'super_admin' || currentUser.role === 'superadmin' || (currentUser.email || '').toLowerCase() === 'urvashinath0409@gmail.com');
-
-  const handleDirectSuperAdminLogin = (email = 'urvashinath0409@gmail.com') => {
-    const rootUser = { uid: 'root-admin', email, name: 'Urvashi Nath', role: 'super_admin', avatar_url: 'https://lh3.googleusercontent.com/a/ACg8ocL37IpwEpp5zGOBFXLS5covk849qdLdXYaPqh46sQDrC59ESX-opA=s96-c' };
-    localStorage.setItem('edtech_user', JSON.stringify(rootUser));
-    localStorage.setItem('portal_name', rootUser.name);
-    localStorage.setItem('portal_avatar', rootUser.avatar_url);
-    localStorage.setItem('portal_designation', 'Super Administrator');
-    setCurrentUser(rootUser);
-  };
+  // ── Auth checks: Verified via Supabase database profile ──
+  const isSuperAdmin = currentUser && currentUser.role === 'super_admin';
 
   const handleGoogleAuth = () => {
     const pathSegments = window.location.pathname.split('/').filter(Boolean);
@@ -289,13 +511,10 @@ export default function App() {
         <div className="max-w-md w-full p-8 rounded-2xl text-center" style={{ background: 'rgba(13, 20, 36, 0.9)', border: '1px solid rgba(0, 240, 255, 0.3)', boxShadow: '0 0 50px rgba(0, 240, 255, 0.15)' }}>
           <div className="text-5xl mb-4">👑 🛡️</div>
           <h1 className="text-2xl font-bold text-white mb-2">Root SuperAdmin Deck</h1>
-          <p className="text-slate-400 text-xs leading-relaxed mb-6">Restricted to Root Administrators. Current role: <strong className="text-cyan-400 font-mono">{currentUser?.role || 'Guest / Unauthenticated'}</strong></p>
+          <p className="text-slate-400 text-xs leading-relaxed mb-6">Restricted to verified Super Administrators. Current status: <strong className="text-cyan-400 font-mono">{currentUser?.role || 'Guest / Unauthenticated'}</strong></p>
           <div className="flex flex-col gap-3">
-            <button onClick={() => handleDirectSuperAdminLogin('urvashinath0409@gmail.com')} className="w-full py-3 rounded-xl font-bold text-black text-sm flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg, #00F0FF, #3B82F6)', boxShadow: '0 0 20px rgba(0, 240, 255, 0.4)' }}>
-              <i className="ph ph-shield-check text-lg"></i> Authenticate as Root
-            </button>
             <button onClick={handleGoogleAuth} className="w-full py-2.5 rounded-xl font-semibold text-white text-xs border border-slate-700 bg-slate-800/80 hover:bg-slate-700 transition-all flex items-center justify-center gap-2">
-              <i className="ph ph-google-logo text-base text-cyan-400"></i> Sign in via Google OAuth
+              <i className="ph ph-google-logo text-base text-cyan-400"></i> Authenticate via Supabase Auth
             </button>
             <a href={loginUrl} className="w-full py-2 text-slate-400 hover:text-white text-xs font-semibold transition-colors mt-1 inline-block">Return to Portal Login</a>
           </div>
@@ -303,6 +522,8 @@ export default function App() {
       </div>
     );
   }
+
+  const defaultAvatar = `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(currentUser?.name || 'Admin')}`;
 
   // ── Main Portal Shell ──
   return (
@@ -319,15 +540,15 @@ export default function App() {
 
         <div className="profile-section">
           <div className="avatar-wrapper cursor-pointer relative group" onClick={() => setShowPhotoModal(true)} title="Click to customize avatar">
-            <img src={currentUser?.avatar_url || CURRENT_SUPER_ADMIN.avatar} alt="Admin Profile" className="avatar transition-transform duration-300 group-hover:scale-105" onError={(e) => { e.target.src = CURRENT_SUPER_ADMIN.avatar; }} />
+            <img src={currentUser?.avatar_url || defaultAvatar} alt="Admin Profile" className="avatar transition-transform duration-300 group-hover:scale-105" onError={(e) => { e.target.src = defaultAvatar; }} />
             <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <i className="ph ph-camera text-white text-base"></i>
             </div>
             <span className="status-dot"></span>
           </div>
-          <h3 className="profile-name cursor-pointer hover:text-cyan-400 transition-colors" onClick={() => setShowPhotoModal(true)}>{currentUser?.name || CURRENT_SUPER_ADMIN.name}</h3>
+          <h3 className="profile-name cursor-pointer hover:text-cyan-400 transition-colors" onClick={() => setShowPhotoModal(true)}>{currentUser?.name || 'Super Admin'}</h3>
           <span className="profile-role">SUPER ADMIN</span>
-          <p className="text-[11px] text-slate-400 mt-1 font-mono">{currentUser?.email || CURRENT_SUPER_ADMIN.email}</p>
+          <p className="text-[11px] text-slate-400 mt-1 font-mono">{currentUser?.email || ''}</p>
           <button type="button" onClick={() => setShowPhotoModal(true)} className="mt-2.5 px-3 py-1 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[11px] font-bold hover:bg-cyan-500/25 transition-all flex items-center gap-1.5">
             <i className="ph ph-pencil-simple text-xs"></i> Edit Avatar
           </button>
@@ -356,7 +577,7 @@ export default function App() {
         <header className="h-20 glass-panel border-b border-cyan-500/20 px-8 flex items-center justify-between shrink-0 m-4 mb-0 rounded-2xl">
           <div>
             <h2 className="text-xl font-extrabold text-white tracking-wide">SUPERADMIN PORTAL</h2>
-            <p className="text-xs text-cyan-400 font-medium">Welcome back, {CURRENT_SUPER_ADMIN.name}! Full Platform Command Enabled.</p>
+            <p className="text-xs text-cyan-400 font-medium">Welcome back, {currentUser?.name || 'Super Admin'}! Full Platform Command Enabled.</p>
           </div>
           <div className="flex items-center gap-3">
             <FullscreenToggle />

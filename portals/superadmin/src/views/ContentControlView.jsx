@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SUPABASE_CONFIG } from '../constants.js';
+import { supabase } from '../supabase.js';
 
 export function ContentControlView({ onBroadcast }) {
       const [r2Stats, setR2Stats] = useState({ usedMB: '14.20', totalFiles: 1, loading: true });
@@ -7,10 +7,10 @@ export function ContentControlView({ onBroadcast }) {
       useEffect(() => {
         async function fetchLiveR2Usage() {
           try {
-            const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/messages?select=media_url`, {
-              headers: { 'apikey': SUPABASE_CONFIG.key, 'Authorization': `Bearer ${SUPABASE_CONFIG.key}` }
-            });
-            const data = await res.json();
+            const { data, error } = await supabase.from('messages').select('media_url');
+            if (error) {
+              console.warn('Live R2 usage query error:', error.message);
+            }
             let extraBytes = 0;
             let r2FilesCount = 0;
             if (Array.isArray(data)) {
@@ -25,7 +25,7 @@ export function ContentControlView({ onBroadcast }) {
               totalFiles: r2FilesCount + 1,
               loading: false
             });
-          } catch (e) {
+          } catch {
             setR2Stats(s => ({ ...s, loading: false }));
           }
         }

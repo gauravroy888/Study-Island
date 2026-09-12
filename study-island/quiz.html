@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -23,6 +23,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -131,6 +132,694 @@
 <body class="bg-transparent">
     <div id="root"></div>
 
+    <!-- EdTech Island - Embedded EduSDK Analytics Controller (Canonical Generated) -->
+    <script id="edusdk-analytics-controller">
+      (function() {
+        "use strict";
+
+        // ── CANONICAL HEURISTIC WEIGHTS ──────────────────────────────────────────
+        const INDEPENDENCE_WEIGHTS = Object.freeze({
+          independent: 1.00,
+          self_corrected: 0.75,
+          assisted: 0.60,
+          failed: 0.00
+        });
+
+        const DIFFICULTY_WEIGHTS = Object.freeze({
+          easy: 0.6,
+          medium: 1.0,
+          hard: 1.4
+        });
+
+        const BLOOM_WEIGHTS = Object.freeze({
+          remember: 0.5,
+          understand: 0.7,
+          apply: 1.0,
+          analyze: 1.2,
+          evaluate: 1.4,
+          create: 1.5
+        });
+
+        const WAL_KEY = 'edtech_telemetry_wal';
+        const EVIDENCE_KEY = 'edtech_analytics_evidence';
+        const TEST_RESULTS_KEY = 'student_test_results';
+
+        const SUPABASE_URL = 'https://qmyrxvtbzlbnvzxypnus.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFteXJ4dnRiemxibnZ6eHlwbnVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA4OTcsImV4cCI6MjA5NTM5Njg5N30.ABvW_oBzXC2Ffxm5ToLh6t4WmdKPdtg9SyfeAE76iJo';
+
+        const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+        function isValidUuid(val) {
+          return typeof val === 'string' && UUID_REGEX.test(val.trim());
+        }
+
+        function resolveTestUuid(actId) {
+          if (isValidUuid(actId)) return actId;
+          const str = String(actId || '').toLowerCase();
+          if (str.includes('ch10') || str.includes('light') || str.includes('shadow') || str.includes('optics') || str.includes('chapter_10') || str.includes('sci6')) {
+            return 'b6000000-0000-0000-0000-000000000001';
+          }
+          return '151fb21c-fc27-4f0a-b797-0e88699a3e90';
+        }
+
+        function deepFreeze(obj) {
+          if (obj === null || typeof obj !== 'object' || Object.isFrozen(obj)) return obj;
+          Object.getOwnPropertyNames(obj).forEach(name => {
+            const value = obj[name];
+            if (value && typeof value === 'object') deepFreeze(value);
+          });
+          return Object.freeze(obj);
+        }
+
+        function validateActivitySummary({ correctCount, totalQuestions, checkpoints }) {
+          const errors = [];
+          if (typeof totalQuestions !== 'number' || totalQuestions <= 0) {
+            errors.push('totalQuestions must be > 0, got: ' + totalQuestions);
+          }
+          if (typeof correctCount !== 'number' || correctCount < 0) {
+            errors.push('correctCount must be >= 0, got: ' + correctCount);
+          }
+          if (typeof totalQuestions === 'number' && typeof correctCount === 'number' && correctCount > totalQuestions) {
+            errors.push('Integrity: correctCount (' + correctCount + ') cannot exceed totalQuestions (' + totalQuestions + ')');
+          }
+          return errors;
+        }
+
+        function calculateIndependence(checkpoint) {
+          if (!checkpoint) return 1.00;
+          const { correct, hint_used, retry_count } = checkpoint;
+          if (!correct) return INDEPENDENCE_WEIGHTS.failed;
+          if (hint_used) return INDEPENDENCE_WEIGHTS.assisted;
+          if (retry_count && retry_count > 0) return INDEPENDENCE_WEIGHTS.self_corrected;
+          return INDEPENDENCE_WEIGHTS.independent;
+        }
+
+        function calculateMastery(checkpoints) {
+          if (!Array.isArray(checkpoints) || checkpoints.length === 0) return 0;
+          let totalEarnedWeight = 0;
+          let totalMaxWeight = 0;
+          for (const cp of checkpoints) {
+            const diffKey = (cp.difficulty || 'medium').toLowerCase();
+            const bloomKey = (cp.bloom_level || 'apply').toLowerCase();
+            const diffWeight = DIFFICULTY_WEIGHTS[diffKey] ?? 1.0;
+            const bloomWeight = BLOOM_WEIGHTS[bloomKey] ?? 1.0;
+            const itemMaxWeight = diffWeight * bloomWeight;
+            const indMultiplier = calculateIndependence(cp);
+            totalEarnedWeight += itemMaxWeight * indMultiplier;
+            totalMaxWeight += itemMaxWeight;
+          }
+          if (totalMaxWeight === 0) return 0;
+          return Math.round((totalEarnedWeight / totalMaxWeight) * 100);
+        }
+
+        function calculateFluency({ checkpoints = [], is_challenge_mode = false, total_time_ms = 0, time_limit_ms = 15 * 60 * 1000 }) {
+          if (!Array.isArray(checkpoints) || checkpoints.length === 0) return 0;
+          let sumIndependence = 0;
+          let sumResponseTimeMs = 0;
+          let timingCount = 0;
+          let correctCount = 0;
+          for (const cp of checkpoints) {
+            sumIndependence += calculateIndependence(cp);
+            if (typeof cp.response_time_ms === 'number' && cp.response_time_ms > 0) {
+              sumResponseTimeMs += cp.response_time_ms;
+              timingCount++;
+            }
+            if (cp.correct) correctCount++;
+          }
+          const sIndependence = sumIndependence / checkpoints.length;
+          const avgResponseTimeMs = timingCount > 0 ? (sumResponseTimeMs / timingCount) : (total_time_ms > 0 ? (total_time_ms / checkpoints.length) : 30000);
+          const targetLatencyMs = 30000;
+          let sSpeed = 1.0;
+          if (avgResponseTimeMs > targetLatencyMs) {
+            sSpeed = Math.max(0.1, 1.0 - ((avgResponseTimeMs - targetLatencyMs) / 60000) * 0.9);
+          }
+          let sPressure = correctCount / checkpoints.length;
+          if (is_challenge_mode && time_limit_ms > 0 && total_time_ms > time_limit_ms) {
+            sPressure *= 0.8;
+          }
+          const fluency = (0.35 * sSpeed + 0.40 * sIndependence + 0.25 * sPressure) * 100;
+          return Math.round(Math.max(0, Math.min(100, fluency)));
+        }
+
+        function calculateBreakdowns(checkpoints = []) {
+          const bloomBreakdown = {};
+          const loBreakdown = {};
+          let totalIndSum = 0;
+          for (const cp of checkpoints) {
+            const ind = calculateIndependence(cp);
+            totalIndSum += ind;
+            const bKey = (cp.bloom_level || 'apply').toLowerCase();
+            if (!bloomBreakdown[bKey]) bloomBreakdown[bKey] = { total: 0, correct: 0, hints: 0, checkpoints: [] };
+            bloomBreakdown[bKey].total++;
+            if (cp.correct) bloomBreakdown[bKey].correct++;
+            if (cp.hint_used) bloomBreakdown[bKey].hints++;
+            bloomBreakdown[bKey].checkpoints.push(cp);
+
+            const lKey = cp.lo_id || 'GENERAL';
+            if (!loBreakdown[lKey]) {
+              loBreakdown[lKey] = {
+                lo_id: lKey,
+                lo_title: cp.lo_title || 'General Science',
+                total: 0,
+                correct: 0,
+                hints: 0,
+                checkpoints: []
+              };
+            }
+            loBreakdown[lKey].total++;
+            if (cp.correct) loBreakdown[lKey].correct++;
+            if (cp.hint_used) loBreakdown[lKey].hints++;
+            loBreakdown[lKey].checkpoints.push(cp);
+          }
+
+          for (const key of Object.keys(bloomBreakdown)) {
+            bloomBreakdown[key].mastery = calculateMastery(bloomBreakdown[key].checkpoints);
+            bloomBreakdown[key].weight = BLOOM_WEIGHTS[key] || 1.0;
+          }
+
+          for (const key of Object.keys(loBreakdown)) {
+            loBreakdown[key].mastery = calculateMastery(loBreakdown[key].checkpoints);
+            loBreakdown[key].accuracy = Math.round((loBreakdown[key].correct / loBreakdown[key].total) * 100);
+          }
+
+          const overallIndependence = checkpoints.length > 0 ? Math.round((totalIndSum / checkpoints.length) * 100) : 100;
+          return { bloomBreakdown, loBreakdown, overallIndependence };
+        }
+
+        function appendToWal(event) {
+          try {
+            const raw = localStorage.getItem(WAL_KEY);
+            const wal = raw ? JSON.parse(raw) : [];
+            wal.push({
+              wal_id: 'wal_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+              timestamp: new Date().toISOString(),
+              ...event
+            });
+            localStorage.setItem(WAL_KEY, JSON.stringify(wal));
+          } catch (e) {
+            console.warn('[EduSDK] WAL error:', e);
+          }
+        }
+
+        class EduSDKClient {
+          constructor() {
+            this.currentSession = null;
+            this._integrityFailed = false;
+          }
+
+          _detectStudentIdentity(overrides) {
+            overrides = overrides || {};
+            let sId = overrides.student_id || null;
+            let sEmail = overrides.student_email || null;
+            let sName = overrides.student_name || null;
+
+            // 1. Authenticated Supabase session token from localStorage (Canonical Source of Truth)
+            try {
+              for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) {
+                  const raw = localStorage.getItem(k);
+                  if (raw) {
+                    const tokenData = JSON.parse(raw);
+                    const user = tokenData?.user || tokenData?.currentSession?.user;
+                    if (user && isValidUuid(user.id)) {
+                      // Verified authenticated session strictly overrides client overrides
+                      sId = user.id;
+                      sEmail = user.email || sEmail || null;
+                      sName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || sName || null;
+                    }
+                  }
+                  break;
+                }
+              }
+            } catch (e) {}
+
+            // 2. Client-side UI cache fallback (for display only - never used for database ownership)
+            if (!sId || !sEmail || !sName) {
+              try {
+                const raw = localStorage.getItem('edtech_student_user');
+                if (raw) {
+                  const u = JSON.parse(raw);
+                  if (u && u.id !== 'guest_student') {
+                    if (isValidUuid(u.id)) sId = sId || u.id;
+                    sEmail = sEmail || u.email || null;
+                    sName = sName || u.name || u.full_name || null;
+                  }
+                }
+              } catch (e) {}
+            }
+
+            if (!sId || !sEmail || !sName) {
+              try {
+                const raw = localStorage.getItem('edtech_user');
+                if (raw) {
+                  const u = JSON.parse(raw);
+                  if (u && u.id !== 'guest_student') {
+                    if (isValidUuid(u.id)) sId = sId || u.id;
+                    sEmail = sEmail || u.email || null;
+                    sName = sName || u.name || u.full_name || null;
+                  }
+                }
+              } catch (e) {}
+            }
+
+            // Never return synthetic fallback email or non-UUID id
+            if (sId && !isValidUuid(sId)) sId = null;
+            if (sEmail && sEmail.includes('@edtechisland.internal')) sEmail = null;
+
+            return { student_id: sId, student_email: sEmail, student_name: sName };
+          }
+
+          start(opts) {
+            opts = opts || {};
+            const activity_id = opts.activity_id || 'chapter_10_quiz';
+            const activity_type = opts.activity_type || 'chapter_quiz';
+            const total_questions = opts.total_questions || 0;
+            const is_challenge_mode = Boolean(opts.is_challenge_mode);
+            const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+            const identity = this._detectStudentIdentity({
+              student_id: opts.student_id,
+              student_email: opts.student_email,
+              student_name: opts.student_name
+            });
+
+            this.currentSession = {
+              session_id: sessionId,
+              activity_id: activity_id,
+              activity_type: activity_type,
+              total_questions: total_questions,
+              is_challenge_mode: is_challenge_mode,
+              student_id: identity.student_id,
+              student_email: identity.student_email,
+              student_name: identity.student_name,
+              start_time: Date.now(),
+              checkpoints: [],
+              status: 'active'
+            };
+
+            appendToWal({
+              event_type: 'start',
+              session_id: sessionId,
+              payload: {
+                activity_id: activity_id,
+                activity_type: activity_type,
+                total_questions: total_questions,
+                is_challenge_mode: is_challenge_mode,
+                student_id: this.currentSession.student_id,
+                student_email: this.currentSession.student_email,
+                student_name: this.currentSession.student_name
+              }
+            });
+
+            return deepFreeze({ ...this.currentSession });
+          }
+
+          checkpoint(opts) {
+            opts = opts || {};
+            if (!this.currentSession) {
+              this.start({ activity_id: 'chapter_10_quiz', total_questions: 1 });
+            }
+
+            const checkpointRecord = {
+              question_id: String(opts.question_id),
+              lo_id: opts.lo_id || 'LO-01',
+              lo_title: opts.lo_title || 'Optics Concept',
+              bloom_level: String(opts.bloom_level || 'apply').toLowerCase(),
+              difficulty: String(opts.difficulty || 'medium').toLowerCase(),
+              correct: Boolean(opts.correct),
+              hint_used: Boolean(opts.hint_used),
+              retry_count: Number(opts.retry_count) || 0,
+              response_time_ms: Number(opts.response_time_ms) || 0,
+              timestamp: new Date().toISOString()
+            };
+
+            checkpointRecord.independence_score = calculateIndependence(checkpointRecord);
+
+            const existingIdx = this.currentSession.checkpoints.findIndex(c => c.question_id === checkpointRecord.question_id);
+            if (existingIdx >= 0) {
+              this.currentSession.checkpoints[existingIdx] = checkpointRecord;
+            } else {
+              this.currentSession.checkpoints.push(checkpointRecord);
+            }
+
+            appendToWal({
+              event_type: 'checkpoint',
+              session_id: this.currentSession.session_id,
+              payload: checkpointRecord
+            });
+
+            return Object.freeze({ ...checkpointRecord });
+          }
+
+          complete(opts) {
+            opts = opts || {};
+            if (!this.currentSession) {
+              this.start();
+            }
+
+            if (!this.currentSession.student_id || !this.currentSession.student_email || !this.currentSession.student_name) {
+              const refreshed = this._detectStudentIdentity({
+                student_id: this.currentSession.student_id,
+                student_email: this.currentSession.student_email,
+                student_name: this.currentSession.student_name
+              });
+              this.currentSession.student_id = refreshed.student_id;
+              this.currentSession.student_email = refreshed.student_email;
+              this.currentSession.student_name = refreshed.student_name;
+            }
+
+            const checkpoints = this.currentSession.checkpoints || [];
+            const totalQuestions = opts.questions_total !== undefined ? opts.questions_total : (this.currentSession.total_questions || checkpoints.length);
+            const correctCount = opts.questions_correct !== undefined ? opts.questions_correct : checkpoints.filter(c => c.correct).length;
+            const durationMs = opts.time_spent_ms !== undefined ? opts.time_spent_ms : (Date.now() - this.currentSession.start_time);
+
+            // Integrity validation
+            this._integrityFailed = false;
+            const integrityErrors = validateActivitySummary({ correctCount, totalQuestions, checkpoints });
+            if (integrityErrors.length > 0) {
+              console.error('[EduSDK] ⚠️ Integrity validation FAILED.', integrityErrors);
+              this._integrityFailed = true;
+            }
+
+            const calculatedScorePct = opts.score_pct !== undefined ? opts.score_pct : (totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0);
+            const calculatedMastery = opts.mastery_score !== undefined ? opts.mastery_score : calculateMastery(checkpoints);
+            const calculatedFluency = opts.fluency_score !== undefined ? opts.fluency_score : calculateFluency({
+              checkpoints: checkpoints,
+              is_challenge_mode: this.currentSession.is_challenge_mode,
+              total_time_ms: durationMs
+            });
+
+            const breakdowns = calculateBreakdowns(checkpoints);
+
+            const loScores = {};
+            for (const [loKey, loData] of Object.entries(breakdowns.loBreakdown || {})) {
+              const score = typeof loData.mastery === 'number'
+                ? loData.mastery
+                : (loData.total > 0 ? Math.round((loData.correct / loData.total) * 100) : 0);
+              loScores[loKey] = score;
+              const match = loKey.match(/LO-?0?(d+)/i);
+              if (match) {
+                const normKey = 'LO-' + match[1].padStart(2, '0');
+                loScores[normKey] = score;
+              }
+            }
+
+            const dimensions = {
+              mastery: calculatedMastery,
+              fluency: calculatedFluency,
+              application: Math.round((calculatedMastery * 0.7) + (breakdowns.overallIndependence * 0.3)),
+              practicalSkill: loScores['LO-04'] !== undefined ? loScores['LO-04'] : Math.round(calculatedMastery * 0.85),
+              exploration: Math.round(Math.min(100, (breakdowns.overallIndependence * 0.5) + (calculatedFluency * 0.5))),
+              engagement: Math.min(100, Math.max(65, Math.round((correctCount / Math.max(1, totalQuestions)) * 40 + (durationMs > 30000 ? 50 : 35)))),
+              formalAchievement: calculatedScorePct,
+              practical_skill: loScores['LO-04'] !== undefined ? loScores['LO-04'] : Math.round(calculatedMastery * 0.85),
+              formal_achievement: calculatedScorePct
+            };
+
+            const summary = {
+              activity_id: this.currentSession.activity_id || 'chapter_10_quiz',
+              activity_type: this.currentSession.activity_type || 'chapter_quiz',
+              session_id: this.currentSession.session_id,
+              studentId: this.currentSession.student_id,
+              studentEmail: this.currentSession.student_email,
+              studentName: this.currentSession.student_name,
+              student_id: this.currentSession.student_id,
+              student_email: this.currentSession.student_email,
+              student_name: this.currentSession.student_name,
+              completed_at: new Date().toISOString(),
+              score_pct: calculatedScorePct,
+              score: calculatedScorePct,
+              mastery_score: calculatedMastery,
+              fluency_score: calculatedFluency,
+              independence_score: breakdowns.overallIndependence,
+              questions_total: totalQuestions,
+              questions_correct: correctCount,
+              time_spent_ms: durationMs,
+              is_challenge_mode: this.currentSession.is_challenge_mode,
+              bloom_breakdown: breakdowns.bloomBreakdown,
+              lo_breakdown: breakdowns.loBreakdown,
+              loScores: loScores,
+              dimensions: dimensions,
+              checkpoints: checkpoints,
+              internal_scores: {
+                mastery: parseFloat((calculatedMastery / 100).toFixed(4)),
+                fluency: parseFloat((calculatedFluency / 100).toFixed(4)),
+                independence: parseFloat((breakdowns.overallIndependence / 100).toFixed(4)),
+                accuracy: totalQuestions > 0 ? parseFloat((correctCount / totalQuestions).toFixed(4)) : 0.0
+              },
+              quizTitle: 'Chapter 10: Light, Shadows & Optics Quiz',
+              attempt: {
+                id: 'att_' + Date.now(),
+                title: 'Chapter 10 Optics Mastery Assessment',
+                lo: 'LO-01',
+                score: calculatedScorePct,
+                date: new Date().toISOString().split('T')[0],
+                duration: Math.max(1, Math.round(durationMs / 60000)) + ' mins',
+                status: calculatedMastery >= 75 ? 'Mastered' : (calculatedMastery >= 50 ? 'In Progress' : 'Struggling')
+              }
+            };
+
+            this.currentSession.status = 'completed';
+
+            // 1. WAL
+            appendToWal({
+              event_type: 'complete',
+              session_id: this.currentSession.session_id,
+              payload: summary
+            });
+
+            // 2. edtech_analytics_evidence
+            try {
+              let evidenceStore = {};
+              const raw = localStorage.getItem(EVIDENCE_KEY);
+              if (raw) {
+                try { evidenceStore = JSON.parse(raw); } catch (e) { evidenceStore = {}; }
+              }
+              if (Array.isArray(evidenceStore)) {
+                evidenceStore.push(summary);
+              } else {
+                evidenceStore[summary.activity_id] = summary;
+                evidenceStore['latest'] = summary;
+                Object.assign(evidenceStore, summary);
+              }
+              localStorage.setItem(EVIDENCE_KEY, JSON.stringify(evidenceStore));
+            } catch (e) {
+              console.warn('[EduSDK] evidence error:', e);
+            }
+
+            // 3. student_test_results
+            try {
+              let testStore = {};
+              const raw = localStorage.getItem(TEST_RESULTS_KEY);
+              if (raw) {
+                try { testStore = JSON.parse(raw); } catch (e) { testStore = {}; }
+              }
+              const testEntry = {
+                testId: summary.activity_id,
+                testTitle: 'Chapter 10: Light, Shadows & Optics Quiz',
+                score: summary.score_pct,
+                percentage: summary.score_pct,
+                grade: summary.score_pct >= 90 ? 'A+' : summary.score_pct >= 80 ? 'A' : summary.score_pct >= 60 ? 'B' : 'C',
+                mastery: summary.mastery_score,
+                fluency: summary.fluency_score,
+                independence: summary.independence_score,
+                correctCount: summary.questions_correct,
+                totalGraded: summary.questions_total,
+                submittedAt: summary.completed_at
+              };
+              if (Array.isArray(testStore)) {
+                testStore.push(testEntry);
+              } else {
+                testStore[summary.activity_id] = testEntry;
+              }
+              localStorage.setItem(TEST_RESULTS_KEY, JSON.stringify(testStore));
+            } catch (e) {
+              console.warn('[EduSDK] test_results error:', e);
+            }
+
+            // 4. Events & messaging
+            try {
+              window.dispatchEvent(new CustomEvent('edtech:analytics:update', { detail: summary }));
+              if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'edtech:analytics:update', detail: summary }, '*');
+                window.parent.postMessage({ type: 'QUIZ_SUBMITTED', summary: summary }, '*');
+              }
+            } catch (e) {}
+
+            try {
+              if (typeof BroadcastChannel !== 'undefined') {
+                const bc = new BroadcastChannel('edtech_platform_sync');
+                bc.postMessage({
+                  type: 'QUIZ_SUBMITTED',
+                  studentName: summary.studentName || 'Learner',
+                  summary: summary
+                });
+                bc.close();
+              }
+            } catch (e) {}
+
+            // 5. Cloud flush to Supabase (only if integrity passed)
+            if (!this._integrityFailed) {
+              this.flushToCloud(summary).catch(err => {
+                console.warn('[EduSDK] Background cloud flush error:', err);
+              });
+            } else {
+              console.warn('[EduSDK] 🚫 Cloud flush skipped due to integrity validation failure.');
+            }
+
+            return deepFreeze({ ...summary });
+          }
+
+          async flushToCloud(summary) {
+            const rawId = summary.studentId || summary.student_id;
+            const studentId = isValidUuid(rawId) ? rawId : null;
+
+            // FAIL-CLOSED OFFLINE QUEUEING:
+            // If no authenticated identity exists, NEVER insert with null student_id or synthetic email.
+            // Queue the event in WAL with status 'queued_unauthenticated' and explicit reason 'unauthenticated_identity'.
+            if (!studentId) {
+              console.warn('[EduSDK] 🚫 Cloud flush deferred: Unauthenticated visitor or invalid session identity. Event queued in WAL (fail-closed).');
+
+              const unauthPayload = {
+                event_type: 'quiz_complete',
+                session_id: summary.session_id,
+                activity_id: summary.activity_id,
+                status: 'queued_unauthenticated',
+                reason: 'unauthenticated_identity',
+                created_at: new Date().toISOString(),
+                payload: summary
+              };
+
+              appendToWal(unauthPayload);
+              return { success: false, reason: 'unauthenticated_identity', queued: true };
+            }
+
+            // Authenticated write: Extract access token
+            let accessToken = null;
+            try {
+              for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) {
+                  const raw = localStorage.getItem(k);
+                  if (raw) {
+                    const tokenData = JSON.parse(raw);
+                    accessToken = tokenData?.access_token || tokenData?.currentSession?.access_token || null;
+                  }
+                  break;
+                }
+              }
+            } catch (e) {}
+
+            // Prohibit anonymous key as bearer token
+            if (!accessToken) {
+              console.warn('[EduSDK] 🚫 Cloud flush deferred: No valid session token found for authenticated user. Queuing in WAL.');
+              appendToWal({
+                event_type: 'quiz_complete',
+                session_id: summary.session_id,
+                activity_id: summary.activity_id,
+                status: 'queued_unauthenticated',
+                reason: 'missing_session_token',
+                created_at: new Date().toISOString(),
+                payload: summary
+              });
+              return { success: false, reason: 'missing_session_token', queued: true };
+            }
+
+            const results = {};
+
+            // 1. Dual-write analytics_events
+            try {
+              const eventPayload = {
+                student_id: studentId,
+                session_id: summary.session_id,
+                event_type: 'quiz_complete',
+                lesson_id: summary.activity_id,
+                chapter_key: summary.activity_id,
+                payload: summary,
+                internal_scores: summary.internal_scores || null
+              };
+
+              const res = await fetch(SUPABASE_URL + '/rest/v1/analytics_events', {
+                method: 'POST',
+                headers: {
+                  'apikey': SUPABASE_ANON,
+                  'Authorization': 'Bearer ' + accessToken,
+                  'Content-Type': 'application/json',
+                  'Prefer': 'return=minimal'
+                },
+                body: JSON.stringify(eventPayload)
+              });
+
+              if (!res.ok) {
+                console.warn('[EduSDK] analytics_events fetch error status:', res.status);
+              }
+              results.analytics_event = res.ok;
+            } catch (e) {
+              console.warn('[EduSDK] analytics_events fetch error:', e);
+            }
+
+            // 2. Dual-write test_submissions
+            try {
+              const submissionPayload = {
+                student_id: studentId,
+                test_id: resolveTestUuid(summary.activity_id),
+                score: summary.score_pct,
+                answers: {
+                  checkpoints: summary.checkpoints,
+                  bloom_breakdown: summary.bloom_breakdown,
+                  dimensions: summary.dimensions,
+                  lo_breakdown: summary.lo_breakdown
+                },
+                status: 'graded'
+              };
+
+              const res = await fetch(SUPABASE_URL + '/rest/v1/test_submissions', {
+                method: 'POST',
+                headers: {
+                  'apikey': SUPABASE_ANON,
+                  'Authorization': 'Bearer ' + accessToken,
+                  'Content-Type': 'application/json',
+                  'Prefer': 'return=minimal'
+                },
+                body: JSON.stringify(submissionPayload)
+              });
+
+              if (!res.ok) {
+                console.warn('[EduSDK] test_submissions fetch error status:', res.status);
+              }
+              results.test_submission = res.ok;
+            } catch (e) {
+              console.warn('[EduSDK] test_submissions fetch error:', e);
+            }
+
+            return results;
+          }
+
+          abandon(opts) {
+            opts = opts || {};
+            if (!this.currentSession) return;
+            this.currentSession.status = 'abandoned';
+            appendToWal({
+              event_type: 'abandon',
+              session_id: this.currentSession.session_id,
+              payload: { reason: opts.reason || 'user_exit', duration_ms: Date.now() - this.currentSession.start_time }
+            });
+          }
+
+          clearWal() {
+            try { localStorage.removeItem(WAL_KEY); } catch (e) {}
+          }
+
+          getCurrentSession() {
+            return this.currentSession;
+          }
+        }
+
+        window.EduSDK = new EduSDKClient();
+        window.EduSDK_VERSION = '2.0.0-synced';
+      })();
+    </script>
+
     <script type="text/babel">
         /** @jsxRuntime classic */
         const { useState, useEffect, useMemo, useRef } = React;
@@ -201,92 +890,92 @@ back: "Back", quizProgress: "Quiz Progress",
 
         const QUIZ_DATA = {
             see_things: [
-                { id: 'q1_1', text: "If you are in a completely dark room with a shiny mirror and a red apple, what will you see?", options: ["The mirror, because it's shiny.", "The apple, because it's red.", "Nothing, because there is no light to reflect.", "Both, but very dimly."], correct: 2, hint: "Remember what is needed for reflection to happen.", explanation: "In complete darkness, there is no light to reflect off the mirror or the apple, making them both invisible to your eyes.", icon: "apple" },
-                { id: 'q1_2', text: "Why can't you see around corners, even in daylight?", options: ["Light rays bend too slowly.", "Light travels in straight lines.", "Your eyes are not strong enough.", "Air blocks light when it bends."], correct: 1, hint: "Think about the path light takes.", explanation: "Light travels in straight lines and cannot bend around opaque obstacles like walls or corners.", icon: "corner-up-right" },
-                { id: 'q1_3', text: "Which of these is NOT a source of light, but only reflects it?", options: ["A firefly", "The Sun", "A television screen", "The Moon"], correct: 3, hint: "Which one doesn't make its own energy?", explanation: "The Moon does not produce its own light; it simply reflects the light coming from the Sun.", icon: "moon" },
-                { id: 'q1_4', text: "How does a periscope help a submarine crew see above the water?", options: ["It bends light using lenses.", "It bounces light off two mirrors placed at angles.", "It uses cameras and screens.", "It makes the water transparent."], correct: 1, hint: "Think about how reflection can change direction.", explanation: "A periscope uses two mirrors set at 45-degree angles to bounce light down a tube, allowing you to see objects above.", icon: "telescope" },
-                { id: 'q1_5', text: "If you look at a blue shirt under purely red light, what color will it appear?", options: ["Blue", "Red", "Purple", "Black"], correct: 3, hint: "A blue shirt absorbs red light. What bounces back?", explanation: "A blue shirt absorbs all colors except blue. Since there is no blue light in a pure red light beam, it reflects nothing and appears black.", icon: "shirt" },
-                { id: 'q1_6', text: "Why do we see a laser beam in a dusty room but not in a clean room?", options: ["Dust creates light.", "Dust reflects the light towards our eyes.", "The laser gets hotter in dust.", "Clean air absorbs all the laser light."], correct: 1, hint: "We only see light when it enters our eyes.", explanation: "Dust particles in the air scatter the laser light, directing some of it into our eyes so we can see the beam's path.", icon: "wind" },
-                { id: 'q1_7', text: "What part of the eye acts like a screen where the image is formed?", options: ["Pupil", "Lens", "Retina", "Iris"], correct: 2, hint: "It's at the back of the eye.", explanation: "The retina is the light-sensitive layer at the back of the eye where images are focused, acting like a projection screen.", icon: "eye" },
-                { id: 'q1_8', text: "Why do pupils get larger in a dark room?", options: ["To focus better.", "To let more light in.", "To change eye color.", "To rest the eye muscles."], correct: 1, hint: "Think of the pupil like a window.", explanation: "Pupils dilate (widen) in darkness to allow as much light as possible to enter the eye, improving night vision.", icon: "maximize" },
-                { id: 'q1_9', text: "Smooth, shiny surfaces form clear reflections because they bounce light rays...", options: ["In many different directions.", "Back in the exact same parallel direction.", "Faster than rough surfaces.", "Only if the light is white."], correct: 1, hint: "Think about a bouncing ball on a flat vs bumpy floor.", explanation: "Smooth surfaces act like mirrors, reflecting incoming parallel light rays back in exactly the same organized parallel direction.", icon: "sparkles" },
-                { id: 'q1_10', text: "What happens to light when it enters water from air?", options: ["It speeds up and bends.", "It slows down and bends.", "It stops completely.", "It turns into heat."], correct: 1, hint: "Water is denser than air.", explanation: "Because water is denser than air, light slows down as it enters, causing the light rays to bend (refract).", icon: "droplets" },
-                { id: 'q1_11', text: "Which surface would scatter light the most?", options: ["A calm lake", "A polished silver spoon", "A crumpled piece of aluminum foil", "A clean window"], correct: 2, hint: "Scattering means bouncing in all directions.", explanation: "A crumpled piece of foil has a highly uneven surface, which scatters reflected light rays in many different, random directions.", icon: "layers" },
-                { id: 'q1_12', text: "If you want to read a book comfortably, where should the light source be?", options: ["Shining directly into your eyes.", "Behind the book, shining towards you.", "Behind you, shining onto the book.", "Under the book."], correct: 2, hint: "You want the light to bounce off the page to your eyes.", explanation: "Having the light behind you shining directly onto the book ensures the light reflects off the page and into your eyes without glare.", icon: "book-open" },
-                { id: 'q1_13', text: "Why does a pencil look bent when placed in a glass of water?", options: ["The water bends the pencil.", "Light bends as it moves from water to air.", "The glass magnifies the pencil.", "Water absorbs the straight light rays."], correct: 1, hint: "This is called refraction.", explanation: "Light travels at different speeds in water versus air. This change in speed causes the light to bend (refract), creating the illusion.", icon: "glass-water" },
-                { id: 'q1_14', text: "What color is sunlight made of?", options: ["Only yellow light.", "Yellow and white light.", "All colors of the rainbow combined.", "No colors, it's invisible."], correct: 2, hint: "Think of a prism or a rainbow.", explanation: "White sunlight is actually a mixture of all the colors of the visible spectrum, which can be seen when separated by a prism.", icon: "sun" },
-                { id: 'q1_15', text: "Why do we wear sunglasses on a bright day?", options: ["To make things look darker.", "To block harmful UV rays and reduce glare.", "To change the color of the sky.", "To help us see in the dark later."], correct: 1, hint: "It's not just about brightness, but eye protection.", explanation: "Sunglasses protect the eyes by blocking harmful ultraviolet (UV) rays and reducing intense, blinding light (glare).", icon: "glasses" },
-                { id: 'q1_16', text: "If an object absorbs all colors of light, what color does it appear?", options: ["White", "Black", "Transparent", "Grey"], correct: 1, hint: "What do you see when no light reaches your eye?", explanation: "When an object absorbs all visible light and reflects none back to your eyes, your brain perceives it as black.", icon: "circle" },
-                { id: 'q1_17', text: "If an object reflects all colors of light equally, what color does it appear?", options: ["White", "Black", "A rainbow", "Invisible"], correct: 0, hint: "Combine all colors of light.", explanation: "When an object reflects all wavelengths of the visible spectrum equally, the combined light enters our eyes and we see white.", icon: "palette" },
-                { id: 'q1_18', text: "How do animals with 'eyeshine' (like cats) see better at night?", options: ["Their eyes produce light.", "They have a mirror-like layer that bounces light back through the retina.", "Their pupils never close.", "They use echolocation instead of light."], correct: 1, hint: "It gives their eyes a second chance to catch light.", explanation: "They have a reflective layer (tapetum lucidum) behind the retina that bounces light back through the eye, doubling the light they can detect.", icon: "cat" },
-                { id: 'q1_19', text: "Why is it dangerous to look directly at the Sun?", options: ["It will make you sneeze.", "The intense light and UV rays can damage the retina.", "It causes temporary blindness that never goes away.", "The Sun's gravity pulls on your eyes."], correct: 1, hint: "Think about using a magnifying glass on a leaf.", explanation: "The Sun emits intense visible light and UV radiation that your eye's lens focuses directly onto the retina, which can cause permanent burns.", icon: "shield-alert" },
-                { id: 'q1_20', text: "When you look at a mirror, your left hand appears as the reflection's...", options: ["Left hand", "Right hand", "Top hand", "It disappears"], correct: 1, hint: "Mirrors flip things laterally.", explanation: "Mirrors create a lateral inversion, meaning left and right are perfectly swapped in the reflection.", icon: "split-square-horizontal" }
+                { id: 'q1_1', text: "If you are in a completely dark room with a shiny mirror and a red apple, what will you see?", options: ["The mirror, because it's shiny.", "The apple, because it's red.", "Nothing, because there is no light to reflect.", "Both, but very dimly."], correct: 2, hint: "Remember what is needed for reflection to happen.", explanation: "In complete darkness, there is no light to reflect off the mirror or the apple, making them both invisible to your eyes.", icon: "apple", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q1_2', text: "Why can't you see around corners, even in daylight?", options: ["Light rays bend too slowly.", "Light travels in straight lines.", "Your eyes are not strong enough.", "Air blocks light when it bends."], correct: 1, hint: "Think about the path light takes.", explanation: "Light travels in straight lines and cannot bend around opaque obstacles like walls or corners.", icon: "corner-up-right", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q1_3', text: "Which of these is NOT a source of light, but only reflects it?", options: ["A firefly", "The Sun", "A television screen", "The Moon"], correct: 3, hint: "Which one doesn't make its own energy?", explanation: "The Moon does not produce its own light; it simply reflects the light coming from the Sun.", icon: "moon", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q1_4', text: "How does a periscope help a submarine crew see above the water?", options: ["It bends light using lenses.", "It bounces light off two mirrors placed at angles.", "It uses cameras and screens.", "It makes the water transparent."], correct: 1, hint: "Think about how reflection can change direction.", explanation: "A periscope uses two mirrors set at 45-degree angles to bounce light down a tube, allowing you to see objects above.", icon: "telescope", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "apply", difficulty: "medium" },
+                { id: 'q1_5', text: "If you look at a blue shirt under purely red light, what color will it appear?", options: ["Blue", "Red", "Purple", "Black"], correct: 3, hint: "A blue shirt absorbs red light. What bounces back?", explanation: "A blue shirt absorbs all colors except blue. Since there is no blue light in a pure red light beam, it reflects nothing and appears black.", icon: "shirt", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "analyze", difficulty: "hard" },
+                { id: 'q1_6', text: "Why do we see a laser beam in a dusty room but not in a clean room?", options: ["Dust creates light.", "Dust reflects the light towards our eyes.", "The laser gets hotter in dust.", "Clean air absorbs all the laser light."], correct: 1, hint: "We only see light when it enters our eyes.", explanation: "Dust particles in the air scatter the laser light, directing some of it into our eyes so we can see the beam's path.", icon: "wind", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q1_7', text: "What part of the eye acts like a screen where the image is formed?", options: ["Pupil", "Lens", "Retina", "Iris"], correct: 2, hint: "It's at the back of the eye.", explanation: "The retina is the light-sensitive layer at the back of the eye where images are focused, acting like a projection screen.", icon: "eye", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q1_8', text: "Why do pupils get larger in a dark room?", options: ["To focus better.", "To let more light in.", "To change eye color.", "To rest the eye muscles."], correct: 1, hint: "Think of the pupil like a window.", explanation: "Pupils dilate (widen) in darkness to allow as much light as possible to enter the eye, improving night vision.", icon: "maximize", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q1_9', text: "Smooth, shiny surfaces form clear reflections because they bounce light rays...", options: ["In many different directions.", "Back in the exact same parallel direction.", "Faster than rough surfaces.", "Only if the light is white."], correct: 1, hint: "Think about a bouncing ball on a flat vs bumpy floor.", explanation: "Smooth surfaces act like mirrors, reflecting incoming parallel light rays back in exactly the same organized parallel direction.", icon: "sparkles", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q1_10', text: "What happens to light when it enters water from air?", options: ["It speeds up and bends.", "It slows down and bends.", "It stops completely.", "It turns into heat."], correct: 1, hint: "Water is denser than air.", explanation: "Because water is denser than air, light slows down as it enters, causing the light rays to bend (refract).", icon: "droplets", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q1_11', text: "Which surface would scatter light the most?", options: ["A calm lake", "A polished silver spoon", "A crumpled piece of aluminum foil", "A clean window"], correct: 2, hint: "Scattering means bouncing in all directions.", explanation: "A crumpled piece of foil has a highly uneven surface, which scatters reflected light rays in many different, random directions.", icon: "layers", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "apply", difficulty: "medium" },
+                { id: 'q1_12', text: "If you want to read a book comfortably, where should the light source be?", options: ["Shining directly into your eyes.", "Behind the book, shining towards you.", "Behind you, shining onto the book.", "Under the book."], correct: 2, hint: "You want the light to bounce off the page to your eyes.", explanation: "Having the light behind you shining directly onto the book ensures the light reflects off the page and into your eyes without glare.", icon: "book-open", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "apply", difficulty: "easy" },
+                { id: 'q1_13', text: "Why does a pencil look bent when placed in a glass of water?", options: ["The water bends the pencil.", "Light bends as it moves from water to air.", "The glass magnifies the pencil.", "Water absorbs the straight light rays."], correct: 1, hint: "This is called refraction.", explanation: "Light travels at different speeds in water versus air. This change in speed causes the light to bend (refract), creating the illusion.", icon: "glass-water", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q1_14', text: "What color is sunlight made of?", options: ["Only yellow light.", "Yellow and white light.", "All colors of the rainbow combined.", "No colors, it's invisible."], correct: 2, hint: "Think of a prism or a rainbow.", explanation: "White sunlight is actually a mixture of all the colors of the visible spectrum, which can be seen when separated by a prism.", icon: "sun", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q1_15', text: "Why do we wear sunglasses on a bright day?", options: ["To make things look darker.", "To block harmful UV rays and reduce glare.", "To change the color of the sky.", "To help us see in the dark later."], correct: 1, hint: "It's not just about brightness, but eye protection.", explanation: "Sunglasses protect the eyes by blocking harmful ultraviolet (UV) rays and reducing intense, blinding light (glare).", icon: "glasses", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q1_16', text: "If an object absorbs all colors of light, what color does it appear?", options: ["White", "Black", "Transparent", "Grey"], correct: 1, hint: "What do you see when no light reaches your eye?", explanation: "When an object absorbs all visible light and reflects none back to your eyes, your brain perceives it as black.", icon: "circle", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q1_17', text: "If an object reflects all colors of light equally, what color does it appear?", options: ["White", "Black", "A rainbow", "Invisible"], correct: 0, hint: "Combine all colors of light.", explanation: "When an object reflects all wavelengths of the visible spectrum equally, the combined light enters our eyes and we see white.", icon: "palette", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q1_18', text: "How do animals with 'eyeshine' (like cats) see better at night?", options: ["Their eyes produce light.", "They have a mirror-like layer that bounces light back through the retina.", "Their pupils never close.", "They use echolocation instead of light."], correct: 1, hint: "It gives their eyes a second chance to catch light.", explanation: "They have a reflective layer (tapetum lucidum) behind the retina that bounces light back through the eye, doubling the light they can detect.", icon: "cat", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "analyze", difficulty: "hard" },
+                { id: 'q1_19', text: "Why is it dangerous to look directly at the Sun?", options: ["It will make you sneeze.", "The intense light and UV rays can damage the retina.", "It causes temporary blindness that never goes away.", "The Sun's gravity pulls on your eyes."], correct: 1, hint: "Think about using a magnifying glass on a leaf.", explanation: "The Sun emits intense visible light and UV radiation that your eye's lens focuses directly onto the retina, which can cause permanent burns.", icon: "shield-alert", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q1_20', text: "When you look at a mirror, your left hand appears as the reflection's...", options: ["Left hand", "Right hand", "Top hand", "It disappears"], correct: 1, hint: "Mirrors flip things laterally.", explanation: "Mirrors create a lateral inversion, meaning left and right are perfectly swapped in the reflection.", icon: "split-square-horizontal", lo_id: "LO-01", lo_title: "Rectilinear Propagation & Reflection", bloom_level: "apply", difficulty: "medium" }
             ],
             materials: [
-                { id: 'q2_1', text: "Why do bathrooms often have frosted glass windows instead of clear glass?", options: ["Frosted glass is stronger.", "It lets light in (translucent) but prevents people from seeing details.", "It completely blocks all light (opaque).", "It changes the color of the sunlight."], correct: 1, hint: "Think about privacy vs. needing light.", explanation: "Frosted glass is translucent. It scatters light so the room stays bright, but prevents clear shapes from being seen, ensuring privacy.", icon: "bath" },
-                { id: 'q2_2', text: "If you want to build a greenhouse to grow plants, what material should the roof be?", options: ["Wood", "Cardboard", "Clear plastic or glass", "Frosted glass"], correct: 2, hint: "Plants need maximum direct sunlight.", explanation: "Plants need maximum sunlight for photosynthesis, so the roof should be made of a clear, transparent material that lets all light pass through.", icon: "tree-pine" },
-                { id: 'q2_3', text: "Which of these is an opaque object?", options: ["A clean swimming pool", "A piece of tissue paper", "A wooden door", "A magnifying glass"], correct: 2, hint: "Which one completely blocks light?", explanation: "A wooden door is completely opaque, meaning it absorbs or reflects all light and lets none pass through.", icon: "door-closed" },
-                { id: 'q2_4', text: "You are reading a secret map with a flashlight under a blanket. The blanket is most likely...", options: ["Transparent", "Translucent", "Opaque", "Luminous"], correct: 2, hint: "Can someone outside the blanket see the map clearly?", explanation: "If you are hiding under it, the blanket must be blocking the light from escaping, meaning it acts as an opaque barrier.", icon: "map" },
-                { id: 'q2_5', text: "Deep ocean water is completely dark. What does this tell you about thick layers of water?", options: ["Water becomes opaque when it is very deep.", "Water is always opaque.", "Water glows in the dark.", "Light travels faster in deep water."], correct: 0, hint: "Even clear things can block light if there is enough of them.", explanation: "Even transparent substances like water absorb a tiny amount of light. Over great depths, this eventually absorbs all light, making the deep ocean opaque.", icon: "waves" },
-                { id: 'q2_6', text: "Wax paper is best described as...", options: ["Transparent", "Translucent", "Opaque", "Reflective"], correct: 1, hint: "Can you read a book clearly through it?", explanation: "Wax paper is translucent. It allows some light to pass through but scatters it, making objects on the other side look blurry.", icon: "scroll" },
-                { id: 'q2_7', text: "Why is a car's windshield made of transparent material?", options: ["So the car looks nice.", "To stop the wind.", "So the driver can see the road perfectly clearly.", "To keep the car warm."], correct: 2, hint: "Safety requires clear vision.", explanation: "Windshields must be perfectly transparent so the driver has a clear, undistorted view of the road for safety.", icon: "car" },
-                { id: 'q2_8', text: "Which material casts the darkest, sharpest shadow?", options: ["A clear glass cup", "A sheet of tracing paper", "A thick brick", "A plastic water bottle"], correct: 2, hint: "Dark shadows need light to be completely blocked.", explanation: "A thick brick is completely opaque and blocks all light, creating a highly dark and sharp shadow.", icon: "box" },
-                { id: 'q2_9', text: "Sunglasses lenses are usually...", options: ["Transparent", "Translucent", "Opaque", "Mirrored on both sides"], correct: 1, hint: "They let some light through, but not all.", explanation: "Sunglasses are translucent; they allow some light to pass through so you can see, but absorb the rest to reduce glare.", icon: "glasses" },
-                { id: 'q2_10', text: "If you paint a clear glass jar with black paint, it changes from...", options: ["Transparent to translucent.", "Opaque to transparent.", "Transparent to opaque.", "Translucent to opaque."], correct: 2, hint: "Paint blocks light.", explanation: "Black paint absorbs light. Applying it to clear, transparent glass stops light from passing through, making the glass opaque.", icon: "brush" },
-                { id: 'q2_11', text: "Why do we use lampshades instead of bare bulbs?", options: ["To make the light brighter.", "To make the light source translucent, spreading it softly and reducing glare.", "To make the light opaque.", "To save electricity."], correct: 1, hint: "Staring at a bare bulb hurts.", explanation: "Lampshades act as a translucent barrier to scatter the harsh light of the bulb, creating a softer, more comfortable room lighting.", icon: "lamp" },
-                { id: 'q2_12', text: "A cloud on a foggy day acts like a...", options: ["Transparent layer", "Translucent layer", "Opaque solid", "Mirror"], correct: 1, hint: "It's bright outside, but you can't see the sun clearly.", explanation: "Clouds scatter sunlight. They allow general brightness to pass through but obscure the clear shape of the sun, acting as a translucent layer.", icon: "cloud" },
-                { id: 'q2_13', text: "Which of these objects would NOT cast a noticeable shadow on a sunny day?", options: ["A tree", "A clean pane of glass", "A person", "A parked car"], correct: 1, hint: "Shadows need blocked light.", explanation: "A perfectly clean pane of glass is transparent and lets almost all light pass straight through, so it casts virtually no shadow.", icon: "image" },
-                { id: 'q2_14', text: "Stained glass windows in churches are beautiful because they are...", options: ["Opaque and block light.", "Transparent and invisible.", "Translucent and color the light passing through.", "Reflective like mirrors."], correct: 2, hint: "They let colored light enter the building.", explanation: "Stained glass is translucent; it allows light to pass through but filters it to display specific vibrant colors inside.", icon: "church" },
-                { id: 'q2_15', text: "What happens to light when it hits an opaque object?", options: ["It passes right through.", "It bends and continues.", "It is absorbed or reflected, but none passes through.", "It turns into sound."], correct: 2, hint: "It stops going forward.", explanation: "Opaque objects do not transmit light. They either absorb the light energy or reflect it back into the environment.", icon: "stop-circle" },
-                { id: 'q2_16', text: "If you hold a piece of plain printer paper up to a bright window, it is...", options: ["Transparent", "Translucent", "Opaque", "Luminous"], correct: 1, hint: "You can see light, but not clear shapes outside.", explanation: "Plain paper allows a diffuse glow of light to pass through, but you cannot see clear images through it, making it translucent.", icon: "file-text" },
-                { id: 'q2_17', text: "Aluminum foil is...", options: ["Transparent", "Translucent", "Opaque", "Only opaque in the dark"], correct: 2, hint: "Can you see through it at all?", explanation: "Aluminum foil reflects and blocks all light, meaning you cannot see through it at all. Therefore, it is opaque.", icon: "hexagon" },
-                { id: 'q2_18', text: "Why are measuring cups often made of clear plastic or glass?", options: ["They are cheaper to make.", "So you can transparently see exactly how much liquid is inside.", "So they cast interesting shadows.", "To keep liquids cool."], correct: 1, hint: "Function dictates material.", explanation: "Transparent materials allow you to see the exact level and contents of the liquid inside without any obstruction.", icon: "beaker" },
-                { id: 'q2_19', text: "Can an object be both transparent and reflective?", options: ["No, it's impossible.", "Yes, like a clear glass window reflecting the inside of a lit room at night.", "Only if it is made of water.", "Only if it is opaque."], correct: 1, hint: "Have you ever seen your reflection in a window?", explanation: "Yes. Glass transmits most light (transparent) but also reflects a small amount, which is why windows show reflections at night.", icon: "rotate-ccw" },
-                { id: 'q2_20', text: "A material that lets absolutely no light through is...", options: ["Translucent", "Transparent", "Opaque", "Refractive"], correct: 2, hint: "Think of a brick wall.", explanation: "By definition, an opaque material completely blocks all light rays from passing through it.", icon: "shield" }
+                { id: 'q2_1', text: "Why do bathrooms often have frosted glass windows instead of clear glass?", options: ["Frosted glass is stronger.", "It lets light in (translucent) but prevents people from seeing details.", "It completely blocks all light (opaque).", "It changes the color of the sunlight."], correct: 1, hint: "Think about privacy vs. needing light.", explanation: "Frosted glass is translucent. It scatters light so the room stays bright, but prevents clear shapes from being seen, ensuring privacy.", icon: "bath", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "apply", difficulty: "medium" },
+                { id: 'q2_2', text: "If you want to build a greenhouse to grow plants, what material should the roof be?", options: ["Wood", "Cardboard", "Clear plastic or glass", "Frosted glass"], correct: 2, hint: "Plants need maximum direct sunlight.", explanation: "Plants need maximum sunlight for photosynthesis, so the roof should be made of a clear, transparent material that lets all light pass through.", icon: "tree-pine", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "apply", difficulty: "easy" },
+                { id: 'q2_3', text: "Which of these is an opaque object?", options: ["A clean swimming pool", "A piece of tissue paper", "A wooden door", "A magnifying glass"], correct: 2, hint: "Which one completely blocks light?", explanation: "A wooden door is completely opaque, meaning it absorbs or reflects all light and lets none pass through.", icon: "door-closed", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q2_4', text: "You are reading a secret map with a flashlight under a blanket. The blanket is most likely...", options: ["Transparent", "Translucent", "Opaque", "Luminous"], correct: 2, hint: "Can someone outside the blanket see the map clearly?", explanation: "If you are hiding under it, the blanket must be blocking the light from escaping, meaning it acts as an opaque barrier.", icon: "map", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "apply", difficulty: "easy" },
+                { id: 'q2_5', text: "Deep ocean water is completely dark. What does this tell you about thick layers of water?", options: ["Water becomes opaque when it is very deep.", "Water is always opaque.", "Water glows in the dark.", "Light travels faster in deep water."], correct: 0, hint: "Even clear things can block light if there is enough of them.", explanation: "Even transparent substances like water absorb a tiny amount of light. Over great depths, this eventually absorbs all light, making the deep ocean opaque.", icon: "waves", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "analyze", difficulty: "hard" },
+                { id: 'q2_6', text: "Wax paper is best described as...", options: ["Transparent", "Translucent", "Opaque", "Reflective"], correct: 1, hint: "Can you read a book clearly through it?", explanation: "Wax paper is translucent. It allows some light to pass through but scatters it, making objects on the other side look blurry.", icon: "scroll", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q2_7', text: "Why is a car's windshield made of transparent material?", options: ["So the car looks nice.", "To stop the wind.", "So the driver can see the road perfectly clearly.", "To keep the car warm."], correct: 2, hint: "Safety requires clear vision.", explanation: "Windshields must be perfectly transparent so the driver has a clear, undistorted view of the road for safety.", icon: "car", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q2_8', text: "Which material casts the darkest, sharpest shadow?", options: ["A clear glass cup", "A sheet of tracing paper", "A thick brick", "A plastic water bottle"], correct: 2, hint: "Dark shadows need light to be completely blocked.", explanation: "A thick brick is completely opaque and blocks all light, creating a highly dark and sharp shadow.", icon: "box", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q2_9', text: "Sunglasses lenses are usually...", options: ["Transparent", "Translucent", "Opaque", "Mirrored on both sides"], correct: 1, hint: "They let some light through, but not all.", explanation: "Sunglasses are translucent; they allow some light to pass through so you can see, but absorb the rest to reduce glare.", icon: "glasses", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q2_10', text: "If you paint a clear glass jar with black paint, it changes from...", options: ["Transparent to translucent.", "Opaque to transparent.", "Transparent to opaque.", "Translucent to opaque."], correct: 2, hint: "Paint blocks light.", explanation: "Black paint absorbs light. Applying it to clear, transparent glass stops light from passing through, making the glass opaque.", icon: "brush", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "apply", difficulty: "medium" },
+                { id: 'q2_11', text: "Why do we use lampshades instead of bare bulbs?", options: ["To make the light brighter.", "To make the light source translucent, spreading it softly and reducing glare.", "To make the light opaque.", "To save electricity."], correct: 1, hint: "Staring at a bare bulb hurts.", explanation: "Lampshades act as a translucent barrier to scatter the harsh light of the bulb, creating a softer, more comfortable room lighting.", icon: "lamp", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q2_12', text: "A cloud on a foggy day acts like a...", options: ["Transparent layer", "Translucent layer", "Opaque solid", "Mirror"], correct: 1, hint: "It's bright outside, but you can't see the sun clearly.", explanation: "Clouds scatter sunlight. They allow general brightness to pass through but obscure the clear shape of the sun, acting as a translucent layer.", icon: "cloud", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q2_13', text: "Which of these objects would NOT cast a noticeable shadow on a sunny day?", options: ["A tree", "A clean pane of glass", "A person", "A parked car"], correct: 1, hint: "Shadows need blocked light.", explanation: "A perfectly clean pane of glass is transparent and lets almost all light pass straight through, so it casts virtually no shadow.", icon: "image", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q2_14', text: "Stained glass windows in churches are beautiful because they are...", options: ["Opaque and block light.", "Transparent and invisible.", "Translucent and color the light passing through.", "Reflective like mirrors."], correct: 2, hint: "They let colored light enter the building.", explanation: "Stained glass is translucent; it allows light to pass through but filters it to display specific vibrant colors inside.", icon: "church", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q2_15', text: "What happens to light when it hits an opaque object?", options: ["It passes right through.", "It bends and continues.", "It is absorbed or reflected, but none passes through.", "It turns into sound."], correct: 2, hint: "It stops going forward.", explanation: "Opaque objects do not transmit light. They either absorb the light energy or reflect it back into the environment.", icon: "stop-circle", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q2_16', text: "If you hold a piece of plain printer paper up to a bright window, it is...", options: ["Transparent", "Translucent", "Opaque", "Luminous"], correct: 1, hint: "You can see light, but not clear shapes outside.", explanation: "Plain paper allows a diffuse glow of light to pass through, but you cannot see clear images through it, making it translucent.", icon: "file-text", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q2_17', text: "Aluminum foil is...", options: ["Transparent", "Translucent", "Opaque", "Only opaque in the dark"], correct: 2, hint: "Can you see through it at all?", explanation: "Aluminum foil reflects and blocks all light, meaning you cannot see through it at all. Therefore, it is opaque.", icon: "hexagon", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q2_18', text: "Why are measuring cups often made of clear plastic or glass?", options: ["They are cheaper to make.", "So you can transparently see exactly how much liquid is inside.", "So they cast interesting shadows.", "To keep liquids cool."], correct: 1, hint: "Function dictates material.", explanation: "Transparent materials allow you to see the exact level and contents of the liquid inside without any obstruction.", icon: "beaker", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q2_19', text: "Can an object be both transparent and reflective?", options: ["No, it's impossible.", "Yes, like a clear glass window reflecting the inside of a lit room at night.", "Only if it is made of water.", "Only if it is opaque."], correct: 1, hint: "Have you ever seen your reflection in a window?", explanation: "Yes. Glass transmits most light (transparent) but also reflects a small amount, which is why windows show reflections at night.", icon: "rotate-ccw", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "analyze", difficulty: "hard" },
+                { id: 'q2_20', text: "A material that lets absolutely no light through is...", options: ["Translucent", "Transparent", "Opaque", "Refractive"], correct: 2, hint: "Think of a brick wall.", explanation: "By definition, an opaque material completely blocks all light rays from passing through it.", icon: "shield", lo_id: "LO-02", lo_title: "Transparent, Translucent & Opaque Materials", bloom_level: "remember", difficulty: "easy" }
             ],
             shadows: [
-                { id: 'q3_1', text: "If you walk towards a streetlamp at night, what happens to your shadow?", options: ["It gets shorter and moves behind you.", "It gets longer and moves in front of you.", "It disappears completely.", "It stays the exact same size."], correct: 0, hint: "Think about the angle of the light hitting you from above.", explanation: "As the light source comes to be directly above you, the angle steepens, making your shadow shorter and shifting it behind you.", icon: "arrow-right" },
-                { id: 'q3_2', text: "What three things are absolutely necessary to create a shadow?", options: ["Sun, an object, and dirt.", "A light source, an opaque/translucent object, and a surface.", "A flashlight, a mirror, and a wall.", "Eyes, light, and darkness."], correct: 1, hint: "You need something to block the path.", explanation: "To form a shadow, you require a light source, an opaque object to block that light, and a physical surface for the shadow to fall on.", icon: "box" },
-                { id: 'q3_3', text: "If you want to make a hand shadow puppet look massive on the wall, what should you do?", options: ["Move your hand closer to the wall.", "Move your hand closer to the flashlight.", "Use a smaller flashlight.", "Move both your hand and flashlight away from the wall."], correct: 1, hint: "Blocking more of the light beam makes a bigger dark spot.", explanation: "Moving your hand closer to the light source blocks a larger portion of the expanding light beam, creating a bigger shadow on the wall.", icon: "hand" },
-                { id: 'q3_4', text: "At what time of day is your shadow outside the shortest?", options: ["Early morning", "Late afternoon", "Exactly at Noon (midday)", "Midnight"], correct: 2, hint: "When is the sun highest in the sky?", explanation: "At noon, the sun is at its highest point in the sky, casting light almost straight down and creating the shortest possible shadows.", icon: "clock" },
-                { id: 'q3_5', text: "If an object is perfectly round (a sphere), will its shadow always be a perfect circle?", options: ["Yes, always.", "No, it depends on the angle of the light and the surface it falls on.", "Only if the light is directly above it.", "Spheres do not cast shadows."], correct: 1, hint: "Imagine a ball lit from the side casting a shadow on a slanted roof.", explanation: "The shape of a shadow can distort into an oval (ellipse) depending on the angle of the light or if the surface it falls on is slanted.", icon: "circle-dot" },
-                { id: 'q3_6', text: "Why is a shadow never perfectly black, but usually dark grey?", options: ["Light leaks through the object.", "Other light sources (like light bouncing off walls/sky) fill in the dark area slightly.", "Our eyes play tricks on us.", "Shadows are naturally grey."], correct: 1, hint: "Is there ever only ONE ray of light in a room?", explanation: "Ambient light from the sky, reflecting off walls, and scattering in the air partially illuminates the shadowed area, preventing it from being pure black.", icon: "activity" },
-                { id: 'q3_7', text: "The dark, sharp inner part of a shadow is called the...", options: ["Penumbra", "Umbra", "Eclipse", "Silhouette"], correct: 1, hint: "Starts with 'U'.", explanation: "The umbra is the darkest, innermost part of a shadow where the light source is completely blocked by the object.", icon: "focus" },
-                { id: 'q3_8', text: "The lighter, fuzzy outer edge of a shadow is called the...", options: ["Penumbra", "Umbra", "Halo", "Glow"], correct: 0, hint: "Starts with 'P'.", explanation: "The penumbra is the lighter, blurry outer region of a shadow where the light is only partially blocked.", icon: "cloud-rain" },
-                { id: 'q3_9', text: "If you hold a red ball in front of a white light, what color is its shadow?", options: ["Red", "White", "Dark grey/Black", "Blue"], correct: 2, hint: "A shadow is the ABSENCE of light, not a color.", explanation: "A shadow is simply an area where light is blocked. It has no intrinsic color of its own and will appear dark grey or black.", icon: "circle" },
-                { id: 'q3_10', text: "How does a sundial tell time?", options: ["By using a clock mechanism inside.", "By measuring the heat of the sun.", "By tracking the changing position and length of a shadow as the Earth rotates.", "By counting clouds."], correct: 2, hint: "Ancient clocks used shadows.", explanation: "As the Earth rotates, the sun's position changes in the sky, moving a cast shadow across the sundial's markings to indicate time.", icon: "compass" },
-                { id: 'q3_11', text: "If you have two light sources shining on an object from different angles, how many shadows will it have?", options: ["One very dark one.", "Two separate shadows.", "No shadows.", "It will glow."], correct: 1, hint: "Each light casts its own shadow.", explanation: "Each distinct light source will cast its own independent shadow of the object, resulting in multiple shadows.", icon: "zap" },
-                { id: 'q3_12', text: "Why do airplanes flying high in the sky rarely cast a visible shadow on the ground?", options: ["Planes are transparent.", "They fly faster than light.", "The shadow becomes too blurry and scattered to see from that distance (penumbra effect).", "The sun is too bright up there."], correct: 2, hint: "The farther away, the softer the shadow gets until it fades.", explanation: "Due to the vast distance from the ground, the sunlight scatters around the plane, causing the shadow to blur entirely before reaching the surface.", icon: "plane" },
-                { id: 'q3_13', text: "If you trace your shadow on the ground at 9 AM, and stand in the exact same spot at 3 PM, what will be different?", options: ["The shadow will be the same.", "The shadow will be pointing in a different direction.", "The shadow will be a different color.", "You will not have a shadow at 3 PM."], correct: 1, hint: "The sun moves across the sky.", explanation: "Because the Earth rotates, the sun's position in the sky changes throughout the day, which dramatically alters the direction your shadow points.", icon: "arrow-right-left" },
-                { id: 'q3_14', text: "What happens to a shadow's size when you move the surface (screen) further away from the object?", options: ["It gets smaller and sharper.", "It gets larger and blurrier.", "It stays exactly the same.", "It disappears instantly."], correct: 1, hint: "The light beam is spreading outwards.", explanation: "As the screen moves further away, the blocked light rays have more distance to spread out, making the shadow larger and its edges blurrier.", icon: "expand" },
-                { id: 'q3_15', text: "Can a transparent object cast a shadow?", options: ["No, never.", "Yes, a very faint one, because it might reflect or absorb a tiny bit of light, or have dirt on it.", "Yes, a pitch black one.", "Only underwater."], correct: 1, hint: "Is any glass 100% perfectly clear?", explanation: "Even highly transparent objects reflect or absorb a tiny fraction of light, and edge distortion can cast very faint, noticeable shadows.", icon: "search" },
-                { id: 'q3_16', text: "Which shape of object will ALWAYS cast a rectangular shadow, no matter how you rotate it?", options: ["A cube", "A cylinder", "A sphere", "None of these"], correct: 3, hint: "Think about rotating a cube or cylinder.", explanation: "Every 3D shape changes its shadow outline depending on its orientation relative to the light source. None will always cast a rectangle.", icon: "rectangle-horizontal" },
-                { id: 'q3_17', text: "To make a shadow appear sharp with crisp edges, you need...", options: ["A very large, diffuse light source.", "A very small, point-like light source.", "A colored light source.", "A very distant screen."], correct: 1, hint: "A tiny bulb vs a large frosted lamp.", explanation: "A small, point-like light source minimizes the penumbra (the blurry edge effect), creating a very sharp and crisp umbra shadow.", icon: "target" },
-                { id: 'q3_18', text: "During a stage play, an actor has three shadows behind them. Why?", options: ["They are moving very fast.", "There are three spotlights shining on them from different places.", "It's an optical illusion.", "The stage is made of mirrors."], correct: 1, hint: "Count the lights.", explanation: "Shadows are created per light source. If an actor has three shadows, it is because three separate spotlights are shining on them.", icon: "monitor-up" },
-                { id: 'q3_19', text: "If you place an object right against a wall and shine a light on it, the shadow will be...", options: ["Huge and blurry.", "Exactly the same size as the object and very sharp.", "Invisible.", "Upside down."], correct: 1, hint: "There is no room for the light to spread.", explanation: "When an object is flush against a wall, there is no distance for the light to spread out, resulting in a perfectly sharp, true-to-size shadow.", icon: "maximize" },
-                { id: 'q3_20', text: "Shadows are evidence that light travels...", options: ["In waves.", "Through water.", "In straight lines.", "Very slowly."], correct: 2, hint: "If it curved, it would bend around the object.", explanation: "If light traveled in curves, it would easily bend around opaque objects and fill in the dark space. Shadows prove it travels in straight lines.", icon: "zap" }
+                { id: 'q3_1', text: "If you walk towards a streetlamp at night, what happens to your shadow?", options: ["It gets shorter and moves behind you.", "It gets longer and moves in front of you.", "It disappears completely.", "It stays the exact same size."], correct: 0, hint: "Think about the angle of the light hitting you from above.", explanation: "As the light source comes to be directly above you, the angle steepens, making your shadow shorter and shifting it behind you.", icon: "arrow-right", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "analyze", difficulty: "medium" },
+                { id: 'q3_2', text: "What three things are absolutely necessary to create a shadow?", options: ["Sun, an object, and dirt.", "A light source, an opaque/translucent object, and a surface.", "A flashlight, a mirror, and a wall.", "Eyes, light, and darkness."], correct: 1, hint: "You need something to block the path.", explanation: "To form a shadow, you require a light source, an opaque object to block that light, and a physical surface for the shadow to fall on.", icon: "box", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q3_3', text: "If you want to make a hand shadow puppet look massive on the wall, what should you do?", options: ["Move your hand closer to the wall.", "Move your hand closer to the flashlight.", "Use a smaller flashlight.", "Move both your hand and flashlight away from the wall."], correct: 1, hint: "Blocking more of the light beam makes a bigger dark spot.", explanation: "Moving your hand closer to the light source blocks a larger portion of the expanding light beam, creating a bigger shadow on the wall.", icon: "hand", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "apply", difficulty: "medium" },
+                { id: 'q3_4', text: "At what time of day is your shadow outside the shortest?", options: ["Early morning", "Late afternoon", "Exactly at Noon (midday)", "Midnight"], correct: 2, hint: "When is the sun highest in the sky?", explanation: "At noon, the sun is at its highest point in the sky, casting light almost straight down and creating the shortest possible shadows.", icon: "clock", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q3_5', text: "If an object is perfectly round (a sphere), will its shadow always be a perfect circle?", options: ["Yes, always.", "No, it depends on the angle of the light and the surface it falls on.", "Only if the light is directly above it.", "Spheres do not cast shadows."], correct: 1, hint: "Imagine a ball lit from the side casting a shadow on a slanted roof.", explanation: "The shape of a shadow can distort into an oval (ellipse) depending on the angle of the light or if the surface it falls on is slanted.", icon: "circle-dot", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "analyze", difficulty: "medium" },
+                { id: 'q3_6', text: "Why is a shadow never perfectly black, but usually dark grey?", options: ["Light leaks through the object.", "Other light sources (like light bouncing off walls/sky) fill in the dark area slightly.", "Our eyes play tricks on us.", "Shadows are naturally grey."], correct: 1, hint: "Is there ever only ONE ray of light in a room?", explanation: "Ambient light from the sky, reflecting off walls, and scattering in the air partially illuminates the shadowed area, preventing it from being pure black.", icon: "activity", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q3_7', text: "The dark, sharp inner part of a shadow is called the...", options: ["Penumbra", "Umbra", "Eclipse", "Silhouette"], correct: 1, hint: "Starts with 'U'.", explanation: "The umbra is the darkest, innermost part of a shadow where the light source is completely blocked by the object.", icon: "focus", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q3_8', text: "The lighter, fuzzy outer edge of a shadow is called the...", options: ["Penumbra", "Umbra", "Halo", "Glow"], correct: 0, hint: "Starts with 'P'.", explanation: "The penumbra is the lighter, blurry outer region of a shadow where the light is only partially blocked.", icon: "cloud-rain", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q3_9', text: "If you hold a red ball in front of a white light, what color is its shadow?", options: ["Red", "White", "Dark grey/Black", "Blue"], correct: 2, hint: "A shadow is the ABSENCE of light, not a color.", explanation: "A shadow is simply an area where light is blocked. It has no intrinsic color of its own and will appear dark grey or black.", icon: "circle", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q3_10', text: "How does a sundial tell time?", options: ["By using a clock mechanism inside.", "By measuring the heat of the sun.", "By tracking the changing position and length of a shadow as the Earth rotates.", "By counting clouds."], correct: 2, hint: "Ancient clocks used shadows.", explanation: "As the Earth rotates, the sun's position changes in the sky, moving a cast shadow across the sundial's markings to indicate time.", icon: "compass", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q3_11', text: "If you have two light sources shining on an object from different angles, how many shadows will it have?", options: ["One very dark one.", "Two separate shadows.", "No shadows.", "It will glow."], correct: 1, hint: "Each light casts its own shadow.", explanation: "Each distinct light source will cast its own independent shadow of the object, resulting in multiple shadows.", icon: "zap", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "apply", difficulty: "medium" },
+                { id: 'q3_12', text: "Why do airplanes flying high in the sky rarely cast a visible shadow on the ground?", options: ["Planes are transparent.", "They fly faster than light.", "The shadow becomes too blurry and scattered to see from that distance (penumbra effect).", "The sun is too bright up there."], correct: 2, hint: "The farther away, the softer the shadow gets until it fades.", explanation: "Due to the vast distance from the ground, the sunlight scatters around the plane, causing the shadow to blur entirely before reaching the surface.", icon: "plane", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "analyze", difficulty: "hard" },
+                { id: 'q3_13', text: "If you trace your shadow on the ground at 9 AM, and stand in the exact same spot at 3 PM, what will be different?", options: ["The shadow will be the same.", "The shadow will be pointing in a different direction.", "The shadow will be a different color.", "You will not have a shadow at 3 PM."], correct: 1, hint: "The sun moves across the sky.", explanation: "Because the Earth rotates, the sun's position in the sky changes throughout the day, which dramatically alters the direction your shadow points.", icon: "arrow-right-left", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q3_14', text: "What happens to a shadow's size when you move the surface (screen) further away from the object?", options: ["It gets smaller and sharper.", "It gets larger and blurrier.", "It stays exactly the same.", "It disappears instantly."], correct: 1, hint: "The light beam is spreading outwards.", explanation: "As the screen moves further away, the blocked light rays have more distance to spread out, making the shadow larger and its edges blurrier.", icon: "expand", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "analyze", difficulty: "medium" },
+                { id: 'q3_15', text: "Can a transparent object cast a shadow?", options: ["No, never.", "Yes, a very faint one, because it might reflect or absorb a tiny bit of light, or have dirt on it.", "Yes, a pitch black one.", "Only underwater."], correct: 1, hint: "Is any glass 100% perfectly clear?", explanation: "Even highly transparent objects reflect or absorb a tiny fraction of light, and edge distortion can cast very faint, noticeable shadows.", icon: "search", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q3_16', text: "Which shape of object will ALWAYS cast a rectangular shadow, no matter how you rotate it?", options: ["A cube", "A cylinder", "A sphere", "None of these"], correct: 3, hint: "Think about rotating a cube or cylinder.", explanation: "Every 3D shape changes its shadow outline depending on its orientation relative to the light source. None will always cast a rectangle.", icon: "rectangle-horizontal", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "analyze", difficulty: "hard" },
+                { id: 'q3_17', text: "To make a shadow appear sharp with crisp edges, you need...", options: ["A very large, diffuse light source.", "A very small, point-like light source.", "A colored light source.", "A very distant screen."], correct: 1, hint: "A tiny bulb vs a large frosted lamp.", explanation: "A small, point-like light source minimizes the penumbra (the blurry edge effect), creating a very sharp and crisp umbra shadow.", icon: "target", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "apply", difficulty: "medium" },
+                { id: 'q3_18', text: "During a stage play, an actor has three shadows behind them. Why?", options: ["They are moving very fast.", "There are three spotlights shining on them from different places.", "It's an optical illusion.", "The stage is made of mirrors."], correct: 1, hint: "Count the lights.", explanation: "Shadows are created per light source. If an actor has three shadows, it is because three separate spotlights are shining on them.", icon: "monitor-up", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "apply", difficulty: "easy" },
+                { id: 'q3_19', text: "If you place an object right against a wall and shine a light on it, the shadow will be...", options: ["Huge and blurry.", "Exactly the same size as the object and very sharp.", "Invisible.", "Upside down."], correct: 1, hint: "There is no room for the light to spread.", explanation: "When an object is flush against a wall, there is no distance for the light to spread out, resulting in a perfectly sharp, true-to-size shadow.", icon: "maximize", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "apply", difficulty: "medium" },
+                { id: 'q3_20', text: "Shadows are evidence that light travels...", options: ["In waves.", "Through water.", "In straight lines.", "Very slowly."], correct: 2, hint: "If it curved, it would bend around the object.", explanation: "If light traveled in curves, it would easily bend around opaque objects and fill in the dark space. Shadows prove it travels in straight lines.", icon: "zap", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "understand", difficulty: "easy" }
             ],
             eclipse: [
-                { id: 'q4_1', text: "During a solar eclipse, what is actually blocking the sun's light from reaching Earth?", options: ["Thick clouds", "The Earth itself", "The Moon", "Another planet"], correct: 2, hint: "What celestial body passes between Earth and the Sun?", explanation: "During a solar eclipse, the Moon orbits exactly between the Earth and the Sun, physically blocking the Sun's light from reaching our planet.", icon: "moon" },
-                { id: 'q4_2', text: "If you are standing in the 'umbra' during a solar eclipse, what do you see?", options: ["A normal, bright sun.", "A partial eclipse (crescent sun).", "A total eclipse (the sun is completely covered).", "A red moon."], correct: 2, hint: "Umbra is the darkest part of the shadow.", explanation: "The umbra is the path of totality. If you stand in it, the Moon completely covers the Sun, allowing you to witness a total solar eclipse.", icon: "eye-off" },
-                { id: 'q4_3', text: "During a lunar eclipse, the Moon looks red or orange. Why?", options: ["The Moon catches fire.", "Earth's atmosphere bends the sun's red light into the shadow, acting like a lens.", "Aliens change the Moon's color.", "The sun turns red."], correct: 1, hint: "Think about sunsets.", explanation: "Earth's atmosphere acts like a lens, bending longer-wavelength red light from all its sunrises and sunsets into the Earth's shadow, tinting the Moon red.", icon: "flame" },
-                { id: 'q4_4', text: "Why don't we have a solar eclipse every single month?", options: ["The Moon is too fast.", "The Moon's orbit is slightly tilted, so its shadow usually misses Earth.", "The Sun moves out of the way.", "We do, but they happen at night."], correct: 1, hint: "The orbits don't align perfectly flat every time.", explanation: "The Moon's orbit is tilted about 5 degrees relative to Earth's orbit, so it usually passes slightly above or below the Sun, missing an exact alignment.", icon: "globe" },
-                { id: 'q4_5', text: "Which is safe to look at directly without special glasses?", options: ["A total solar eclipse (only the totality phase).", "A partial solar eclipse.", "A lunar eclipse.", "Both A and C are correct."], correct: 3, hint: "Looking at the sun is bad. Looking at the moon is fine.", explanation: "Total solar eclipses (only during the 100% totality phase) and lunar eclipses are completely safe to view directly. Partial solar eclipses are never safe.", icon: "glasses" },
-                { id: 'q4_6', text: "In what phase must the Moon be for a solar eclipse to happen?", options: ["Full Moon", "New Moon", "First Quarter", "Crescent"], correct: 1, hint: "The side of the moon facing us must be dark.", explanation: "A solar eclipse can only occur during a New Moon, which is the exact phase when the Moon is situated between the Earth and the Sun.", icon: "moon" },
-                { id: 'q4_7', text: "In what phase must the Moon be for a lunar eclipse to happen?", options: ["Full Moon", "New Moon", "Third Quarter", "Gibbous"], correct: 0, hint: "Earth's shadow needs to cover the whole visible face.", explanation: "A lunar eclipse can only happen during a Full Moon, which is when the Earth is situated directly between the Sun and the Moon.", icon: "circle" },
-                { id: 'q4_8', text: "Who experiences a total solar eclipse?", options: ["Everyone on Earth during the day.", "Only people located inside the Moon's small umbra shadow path on Earth.", "Only people in space.", "Everyone on the night side of Earth."], correct: 1, hint: "The Moon's shadow on Earth is relatively small.", explanation: "The Moon is small, so its dark inner shadow (umbra) only covers a very narrow strip on the Earth's surface, limiting who sees totality.", icon: "target" },
-                { id: 'q4_9', text: "A solar eclipse is essentially just a giant...", options: ["Rainbow", "Reflection", "Shadow cast by the Moon onto Earth.", "Explosion on the sun."], correct: 2, hint: "Apply what you know about shadows to space.", explanation: "An eclipse is a massive display of light and shadows in space. A solar eclipse is simply the Moon casting its physical shadow onto the Earth.", icon: "umbrella" },
-                { id: 'q4_10', text: "If the Moon were much farther away from Earth, how would solar eclipses change?", options: ["They would last for days.", "We would never have total eclipses, only 'annular' (ring of fire) eclipses, because the Moon would look too small to cover the Sun.", "They would happen every week.", "They would become brighter."], correct: 1, hint: "Distance affects apparent size.", explanation: "If the Moon were farther away, its apparent size in the sky would be too small to fully block the Sun, leaving a visible 'ring of fire' (annular eclipse).", icon: "expand" },
-                { id: 'q4_11', text: "What blocks the light during a Lunar Eclipse?", options: ["The Moon", "The Sun", "The Earth", "Clouds"], correct: 2, hint: "The moon goes dark. What is casting the shadow?", explanation: "During a lunar eclipse, the Earth places itself exactly between the Sun and the Moon, causing Earth's massive shadow to fall onto the Moon.", icon: "globe" },
-                { id: 'q4_12', text: "The glowing outer atmosphere of the Sun, visible only during a total solar eclipse, is called the...", options: ["Core", "Corona", "Crust", "Mantle"], correct: 1, hint: "It means 'crown'.", explanation: "The corona is the Sun's extremely hot, glowing outer atmosphere, normally hidden by the Sun's brightness but safely visible during totality.", icon: "sun" },
-                { id: 'q4_13', text: "How long does a total solar eclipse usually last in one specific location?", options: ["A few seconds to a few minutes.", "About an hour.", "A whole day.", "A whole month."], correct: 0, hint: "The shadow is moving very fast across the Earth.", explanation: "Because the Earth is rotating and the Moon is orbiting rapidly, the small umbral shadow races across the surface, making totality last only a few minutes.", icon: "timer" },
-                { id: 'q4_14', text: "Can you see a lunar eclipse during the day?", options: ["Yes, easily.", "No, it only happens when the Moon is on the night side of Earth.", "Only if you wear special glasses.", "Only near the equator."], correct: 1, hint: "Earth has to be between the sun and moon.", explanation: "A lunar eclipse occurs when the Moon enters Earth's shadow. This requires you to be on the night-side of the Earth to see the Moon.", icon: "sunrise" },
-                { id: 'q4_15', text: "What is an 'annular' solar eclipse?", options: ["An eclipse that happens annually (every year).", "When the Moon covers the Sun but leaves a bright ring visible around the edge.", "A lunar eclipse.", "An eclipse caused by an asteroid."], correct: 1, hint: "Annular means 'ring-shaped'.", explanation: "An annular eclipse happens when the Moon is slightly farther from Earth and appears too small to completely cover the Sun, leaving a bright 'ring of fire'.", icon: "circle-dot" },
-                { id: 'q4_16', text: "During a solar eclipse, animals might act strangely. Why?", options: ["The gravity changes.", "They think night is falling suddenly because it gets dark and cool.", "They can hear the moon moving.", "They are scared of the sun."], correct: 1, hint: "Animals rely on light to know when to sleep.", explanation: "The sudden, unnatural drop in light and temperature mimics sunset, tricking birds and animals into displaying evening or sleeping behaviors.", icon: "cat" },
-                { id: 'q4_17', text: "If you lived on the Moon, what would you see during a Lunar Eclipse on Earth?", options: ["A giant shadow covering the Sun.", "The Earth becoming totally dark.", "A bright red ring around the Earth (all the sunrises and sunsets at once).", "Nothing unusual."], correct: 2, hint: "You are looking AT Earth blocking the sun.", explanation: "Looking at Earth, you would see it blocking the Sun entirely, illuminated only by a brilliant red ring of all Earth's sunrises and sunsets happening at once.", icon: "telescope" },
-                { id: 'q4_18', text: "Which type of eclipse can be seen by more people at once?", options: ["Solar Eclipse", "Lunar Eclipse", "Both are seen by the same number of people.", "It depends on the season."], correct: 1, hint: "Earth's shadow is much bigger than the Moon's shadow.", explanation: "Earth's shadow is massive and easily covers the entire Moon, meaning anyone on the dark side of Earth can watch a lunar eclipse simultaneously.", icon: "alert-triangle" },
-                { id: 'q4_19', text: "What causes the Moon's shadow to race across the Earth's surface during a solar eclipse?", options: ["The Earth's rotation and the Moon's orbit.", "The Sun moving very fast.", "Wind pushing the shadow.", "The Moon spinning on its axis."], correct: 0, hint: "Everything in space is moving.", explanation: "The combination of the Moon continuously moving in its orbit and the Earth constantly rotating causes the shadow to trace a fast-moving path.", icon: "radio" },
-                { id: 'q4_20', text: "Ancient people were often terrified of solar eclipses because...", options: ["They caused bad weather.", "They thought a monster was eating the sun and didn't understand the science.", "They were too loud.", "They always caused earthquakes."], correct: 1, hint: "Imagine the sun disappearing without warning.", explanation: "Without modern astronomical knowledge, the sudden, unexplained disappearance of the life-giving Sun was terrifying and often blamed on mythical beasts.", icon: "shield-alert" }
+                { id: 'q4_1', text: "During a solar eclipse, what is actually blocking the sun's light from reaching Earth?", options: ["Thick clouds", "The Earth itself", "The Moon", "Another planet"], correct: 2, hint: "What celestial body passes between Earth and the Sun?", explanation: "During a solar eclipse, the Moon orbits exactly between the Earth and the Sun, physically blocking the Sun's light from reaching our planet.", icon: "moon", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q4_2', text: "If you are standing in the 'umbra' during a solar eclipse, what do you see?", options: ["A normal, bright sun.", "A partial eclipse (crescent sun).", "A total eclipse (the sun is completely covered).", "A red moon."], correct: 2, hint: "Umbra is the darkest part of the shadow.", explanation: "The umbra is the path of totality. If you stand in it, the Moon completely covers the Sun, allowing you to witness a total solar eclipse.", icon: "eye-off", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q4_3', text: "During a lunar eclipse, the Moon looks red or orange. Why?", options: ["The Moon catches fire.", "Earth's atmosphere bends the sun's red light into the shadow, acting like a lens.", "Aliens change the Moon's color.", "The sun turns red."], correct: 1, hint: "Think about sunsets.", explanation: "Earth's atmosphere acts like a lens, bending longer-wavelength red light from all its sunrises and sunsets into the Earth's shadow, tinting the Moon red.", icon: "flame", lo_id: "LO-04", lo_title: "Virtual Practical & Ray Optics Applications", bloom_level: "analyze", difficulty: "hard" },
+                { id: 'q4_4', text: "Why don't we have a solar eclipse every single month?", options: ["The Moon is too fast.", "The Moon's orbit is slightly tilted, so its shadow usually misses Earth.", "The Sun moves out of the way.", "We do, but they happen at night."], correct: 1, hint: "The orbits don't align perfectly flat every time.", explanation: "The Moon's orbit is tilted about 5 degrees relative to Earth's orbit, so it usually passes slightly above or below the Sun, missing an exact alignment.", icon: "globe", lo_id: "LO-04", lo_title: "Virtual Practical & Ray Optics Applications", bloom_level: "analyze", difficulty: "hard" },
+                { id: 'q4_5', text: "Which is safe to look at directly without special glasses?", options: ["A total solar eclipse (only the totality phase).", "A partial solar eclipse.", "A lunar eclipse.", "Both A and C are correct."], correct: 3, hint: "Looking at the sun is bad. Looking at the moon is fine.", explanation: "Total solar eclipses (only during the 100% totality phase) and lunar eclipses are completely safe to view directly. Partial solar eclipses are never safe.", icon: "glasses", lo_id: "LO-04", lo_title: "Virtual Practical & Ray Optics Applications", bloom_level: "apply", difficulty: "easy" },
+                { id: 'q4_6', text: "In what phase must the Moon be for a solar eclipse to happen?", options: ["Full Moon", "New Moon", "First Quarter", "Crescent"], correct: 1, hint: "The side of the moon facing us must be dark.", explanation: "A solar eclipse can only occur during a New Moon, which is the exact phase when the Moon is situated between the Earth and the Sun.", icon: "moon", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q4_7', text: "In what phase must the Moon be for a lunar eclipse to happen?", options: ["Full Moon", "New Moon", "Third Quarter", "Gibbous"], correct: 0, hint: "Earth's shadow needs to cover the whole visible face.", explanation: "A lunar eclipse can only happen during a Full Moon, which is when the Earth is situated directly between the Sun and the Moon.", icon: "circle", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q4_8', text: "Who experiences a total solar eclipse?", options: ["Everyone on Earth during the day.", "Only people located inside the Moon's small umbra shadow path on Earth.", "Only people in space.", "Everyone on the night side of Earth."], correct: 1, hint: "The Moon's shadow on Earth is relatively small.", explanation: "The Moon is small, so its dark inner shadow (umbra) only covers a very narrow strip on the Earth's surface, limiting who sees totality.", icon: "target", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "analyze", difficulty: "medium" },
+                { id: 'q4_9', text: "A solar eclipse is essentially just a giant...", options: ["Rainbow", "Reflection", "Shadow cast by the Moon onto Earth.", "Explosion on the sun."], correct: 2, hint: "Apply what you know about shadows to space.", explanation: "An eclipse is a massive display of light and shadows in space. A solar eclipse is simply the Moon casting its physical shadow onto the Earth.", icon: "umbrella", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "understand", difficulty: "easy" },
+                { id: 'q4_10', text: "If the Moon were much farther away from Earth, how would solar eclipses change?", options: ["They would last for days.", "We would never have total eclipses, only 'annular' (ring of fire) eclipses, because the Moon would look too small to cover the Sun.", "They would happen every week.", "They would become brighter."], correct: 1, hint: "Distance affects apparent size.", explanation: "If the Moon were farther away, its apparent size in the sky would be too small to fully block the Sun, leaving a visible 'ring of fire' (annular eclipse).", icon: "expand", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "analyze", difficulty: "hard" },
+                { id: 'q4_11', text: "What blocks the light during a Lunar Eclipse?", options: ["The Moon", "The Sun", "The Earth", "Clouds"], correct: 2, hint: "The moon goes dark. What is casting the shadow?", explanation: "During a lunar eclipse, the Earth places itself exactly between the Sun and the Moon, causing Earth's massive shadow to fall onto the Moon.", icon: "globe", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "remember", difficulty: "easy" },
+                { id: 'q4_12', text: "The glowing outer atmosphere of the Sun, visible only during a total solar eclipse, is called the...", options: ["Core", "Corona", "Crust", "Mantle"], correct: 1, hint: "It means 'crown'.", explanation: "The corona is the Sun's extremely hot, glowing outer atmosphere, normally hidden by the Sun's brightness but safely visible during totality.", icon: "sun", lo_id: "LO-04", lo_title: "Virtual Practical & Ray Optics Applications", bloom_level: "remember", difficulty: "medium" },
+                { id: 'q4_13', text: "How long does a total solar eclipse usually last in one specific location?", options: ["A few seconds to a few minutes.", "About an hour.", "A whole day.", "A whole month."], correct: 0, hint: "The shadow is moving very fast across the Earth.", explanation: "Because the Earth is rotating and the Moon is orbiting rapidly, the small umbral shadow races across the surface, making totality last only a few minutes.", icon: "timer", lo_id: "LO-04", lo_title: "Virtual Practical & Ray Optics Applications", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q4_14', text: "Can you see a lunar eclipse during the day?", options: ["Yes, easily.", "No, it only happens when the Moon is on the night side of Earth.", "Only if you wear special glasses.", "Only near the equator."], correct: 1, hint: "Earth has to be between the sun and moon.", explanation: "A lunar eclipse occurs when the Moon enters Earth's shadow. This requires you to be on the night-side of the Earth to see the Moon.", icon: "sunrise", lo_id: "LO-04", lo_title: "Virtual Practical & Ray Optics Applications", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q4_15', text: "What is an 'annular' solar eclipse?", options: ["An eclipse that happens annually (every year).", "When the Moon covers the Sun but leaves a bright ring visible around the edge.", "A lunar eclipse.", "An eclipse caused by an asteroid."], correct: 1, hint: "Annular means 'ring-shaped'.", explanation: "An annular eclipse happens when the Moon is slightly farther from Earth and appears too small to completely cover the Sun, leaving a bright 'ring of fire'.", icon: "circle-dot", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "understand", difficulty: "medium" },
+                { id: 'q4_16', text: "During a solar eclipse, animals might act strangely. Why?", options: ["The gravity changes.", "They think night is falling suddenly because it gets dark and cool.", "They can hear the moon moving.", "They are scared of the sun."], correct: 1, hint: "Animals rely on light to know when to sleep.", explanation: "The sudden, unnatural drop in light and temperature mimics sunset, tricking birds and animals into displaying evening or sleeping behaviors.", icon: "cat", lo_id: "LO-04", lo_title: "Virtual Practical & Ray Optics Applications", bloom_level: "apply", difficulty: "medium" },
+                { id: 'q4_17', text: "If you lived on the Moon, what would you see during a Lunar Eclipse on Earth?", options: ["A giant shadow covering the Sun.", "The Earth becoming totally dark.", "A bright red ring around the Earth (all the sunrises and sunsets at once).", "Nothing unusual."], correct: 2, hint: "You are looking AT Earth blocking the sun.", explanation: "Looking at Earth, you would see it blocking the Sun entirely, illuminated only by a brilliant red ring of all Earth's sunrises and sunsets happening at once.", icon: "telescope", lo_id: "LO-04", lo_title: "Virtual Practical & Ray Optics Applications", bloom_level: "analyze", difficulty: "hard" },
+                { id: 'q4_18', text: "Which type of eclipse can be seen by more people at once?", options: ["Solar Eclipse", "Lunar Eclipse", "Both are seen by the same number of people.", "It depends on the season."], correct: 1, hint: "Earth's shadow is much bigger than the Moon's shadow.", explanation: "Earth's shadow is massive and easily covers the entire Moon, meaning anyone on the dark side of Earth can watch a lunar eclipse simultaneously.", icon: "alert-triangle", lo_id: "LO-03", lo_title: "Shadow Formation & Ray Geometry", bloom_level: "analyze", difficulty: "hard" },
+                { id: 'q4_19', text: "What causes the Moon's shadow to race across the Earth's surface during a solar eclipse?", options: ["The Earth's rotation and the Moon's orbit.", "The Sun moving very fast.", "Wind pushing the shadow.", "The Moon spinning on its axis."], correct: 0, hint: "Everything in space is moving.", explanation: "The combination of the Moon continuously moving in its orbit and the Earth constantly rotating causes the shadow to trace a fast-moving path.", icon: "radio", lo_id: "LO-04", lo_title: "Virtual Practical & Ray Optics Applications", bloom_level: "analyze", difficulty: "hard" },
+                { id: 'q4_20', text: "Ancient people were often terrified of solar eclipses because...", options: ["They caused bad weather.", "They thought a monster was eating the sun and didn't understand the science.", "They were too loud.", "They always caused earthquakes."], correct: 1, hint: "Imagine the sun disappearing without warning.", explanation: "Without modern astronomical knowledge, the sudden, unexplained disappearance of the life-giving Sun was terrifying and often blamed on mythical beasts.", icon: "shield-alert", lo_id: "LO-04", lo_title: "Virtual Practical & Ray Optics Applications", bloom_level: "understand", difficulty: "easy" }
             ]
         };
 
@@ -577,6 +1266,13 @@ back: "Back", quizProgress: "Quiz Progress",
             const [activeQuizData, setActiveQuizData] = useState(null); 
             const [showExitModal, setShowExitModal] = useState(false); 
             const [showSubmitModal, setShowSubmitModal] = useState(false);
+            const [analyticsSummary, setAnalyticsSummary] = useState(null);
+
+            // Telemetry timing and retry tracking
+            const questionStartTimesRef = useRef({});
+            const questionTimesRef = useRef({});
+            const retriesRef = useRef({});
+            const sessionStartTimeRef = useRef(null);
             // Scroll refs for review and analysis screens (must be top-level, not inside conditionals)
             const reviewScrollRef = useRef(null);
             const analysisScrollRef = useRef(null);
@@ -609,21 +1305,28 @@ back: "Back", quizProgress: "Quiz Progress",
                 return () => clearInterval(timer);
             }, []);
 
-            useEffect(() => {
+                        useEffect(() => {
                 let interval = null;
                 if (appState === 'playing' && mode === 'timed' && timeRemaining > 0) {
                     interval = setInterval(() => { setTimeRemaining((prev) => prev - 1); }, 1000);
                 } else if (appState === 'playing' && mode === 'timed' && timeRemaining === 0) {
-                    setAppState('results');
+                    confirmSubmit();
                 }
                 return () => clearInterval(interval);
             }, [appState, mode, timeRemaining]);
+
+            // Track question entrance time for response latency telemetry
+            useEffect(() => {
+                if (currentQuestion && !questionStartTimesRef.current[currentQuestion.id]) {
+                    questionStartTimesRef.current[currentQuestion.id] = Date.now();
+                }
+            }, [currentQuestion?.id]);
 
             useEffect(() => {
                 if (appState === 'results') playSound('complete');
             }, [appState]);
 
-            const startGame = (selectedMode) => {
+                        const startGame = (selectedMode) => {
                 playSound('click'); setMode(selectedMode);
                 if (selectedMode === 'timed') setTimeRemaining(15 * 60); 
                 
@@ -639,11 +1342,64 @@ back: "Back", quizProgress: "Quiz Progress",
                 
                 setAppState('playing'); setAnswers({});
                 setCurrentSectionIdx(0); setCurrentQuestionIdx(0);
+                setAnalyticsSummary(null);
+
+                // Initialize telemetry timing & retries
+                const now = Date.now();
+                sessionStartTimeRef.current = now;
+                questionStartTimesRef.current = {};
+                questionTimesRef.current = {};
+                retriesRef.current = {};
+
+                const totalQCount = Object.values(newQuizData).reduce((acc, s) => acc + s.length, 0);
+
+                // Start EduSDK session
+                if (window.EduSDK) {
+                    window.EduSDK.start({
+                        activity_id: 'chapter_10_quiz',
+                        activity_type: 'chapter_quiz',
+                        total_questions: totalQCount,
+                        is_challenge_mode: selectedMode === 'timed'
+                    });
+                }
+
+                const firstQ = newQuizData[SECTIONS[0].id]?.[0];
+                if (firstQ) {
+                    questionStartTimesRef.current[firstQ.id] = now;
+                }
             };
 
-            const handleSelectOption = (originalIndex) => {
+                        const handleSelectOption = (originalIndex) => {
                 playSound('select');
-                setAnswers(prev => ({ ...prev, [currentQuestion.id]: originalIndex }));
+                if (!currentQuestion) return;
+
+                const qId = currentQuestion.id;
+                const isRetry = answers[qId] !== undefined && answers[qId] !== originalIndex;
+                const currentRetries = (retriesRef.current[qId] || 0) + (isRetry ? 1 : 0);
+                retriesRef.current[qId] = currentRetries;
+
+                const startTime = questionStartTimesRef.current[qId] || sessionStartTimeRef.current || Date.now();
+                const responseTimeMs = Date.now() - startTime;
+                questionTimesRef.current[qId] = (questionTimesRef.current[qId] || 0) + responseTimeMs;
+                questionStartTimesRef.current[qId] = Date.now();
+
+                const isCorrect = currentQuestion.correct === originalIndex;
+
+                if (window.EduSDK) {
+                    window.EduSDK.checkpoint({
+                        question_id: qId,
+                        lo_id: currentQuestion.lo_id || 'LO-01',
+                        lo_title: currentQuestion.lo_title || 'Optics Concept',
+                        bloom_level: currentQuestion.bloom_level || 'apply',
+                        difficulty: currentQuestion.difficulty || 'medium',
+                        correct: isCorrect,
+                        hint_used: false,
+                        retry_count: currentRetries,
+                        response_time_ms: questionTimesRef.current[qId]
+                    });
+                }
+
+                setAnswers(prev => ({ ...prev, [qId]: originalIndex }));
             };
 
             const formatTime = (seconds) => {
@@ -706,9 +1462,12 @@ back: "Back", quizProgress: "Quiz Progress",
                 setShowExitModal(true);
             };
 
-            const confirmExit = () => {
+                        const confirmExit = () => {
                 playSound('click');
                 setShowExitModal(false);
+                if (window.EduSDK) {
+                    window.EduSDK.abandon({ reason: 'user_exit' });
+                }
                 setAppState('start');
             };
 
@@ -725,6 +1484,42 @@ back: "Back", quizProgress: "Quiz Progress",
             const confirmSubmit = () => {
                 playSound('click');
                 setShowSubmitModal(false);
+
+                // Ensure all questions have checkpoints in EduSDK
+                if (window.EduSDK && activeQuizData) {
+                    for (const sectionKey in activeQuizData) {
+                        for (const q of activeQuizData[sectionKey]) {
+                            const answeredIdx = answers[q.id];
+                            const isAnswered = answeredIdx !== undefined;
+                            const isCorrect = isAnswered && q.correct === answeredIdx;
+                            const retries = retriesRef.current[q.id] || 0;
+                            const respTime = questionTimesRef.current[q.id] || 0;
+
+                            window.EduSDK.checkpoint({
+                                question_id: q.id,
+                                lo_id: q.lo_id || 'LO-01',
+                                lo_title: q.lo_title || 'Optics Concept',
+                                bloom_level: q.bloom_level || 'apply',
+                                difficulty: q.difficulty || 'medium',
+                                correct: isCorrect,
+                                hint_used: false,
+                                retry_count: retries,
+                                response_time_ms: respTime
+                            });
+                        }
+                    }
+
+                    const score = calculateTotalScore();
+                    const durationMs = sessionStartTimeRef.current ? (Date.now() - sessionStartTimeRef.current) : 0;
+                    const summary = window.EduSDK.complete({
+                        score_pct: totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0,
+                        questions_total: totalQuestions,
+                        questions_correct: score,
+                        time_spent_ms: durationMs
+                    });
+                    setAnalyticsSummary(summary);
+                }
+
                 setAppState('results');
             };
 
@@ -896,6 +1691,11 @@ back: "Back", quizProgress: "Quiz Progress",
 
                                                                 <p className="text-lg sm:text-xl leading-relaxed text-white/90 font-medium mb-6 pr-4">
                                                                     <span className="font-bold text-cyan-300 mr-2">Q{qIdx + 1}.</span>{transQ.text}
+                                                                    <span className="inline-flex gap-1.5 ml-3 align-middle">
+                                                                        <span className="text-[10px] uppercase px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 font-mono font-semibold">{q.lo_id || 'LO-01'}</span>
+                                                                        <span className="text-[10px] uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-medium">{q.difficulty || 'medium'}</span>
+                                                                        <span className="text-[10px] uppercase px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-medium">{q.bloom_level || 'apply'}</span>
+                                                                    </span>
                                                                 </p>
 
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-6">
@@ -1017,8 +1817,11 @@ back: "Back", quizProgress: "Quiz Progress",
                 );
             }
 
-            if (appState === 'results') {
+                        if (appState === 'results') {
                 const score = calculateTotalScore();
+                const masteryScore = analyticsSummary?.mastery_score ?? Math.round((score / totalQuestions) * 100);
+                const fluencyScore = analyticsSummary?.fluency_score ?? 0;
+                const indepScore = analyticsSummary?.independence_score ?? 100;
                 return (
                     <div className="min-h-screen w-full text-white font-sans flex items-center justify-center relative overflow-hidden">
                         <DefaultAppBackground />
@@ -1029,14 +1832,30 @@ back: "Back", quizProgress: "Quiz Progress",
                             <h1 className="text-3xl sm:text-4xl font-bold mb-2">{ui.complete}</h1>
                             <p className="text-white/70 mb-8">{ui.subtitle}</p>
                             
-                            <div className="bg-black/20 rounded-2xl p-6 mb-8">
+                            <div className="bg-black/20 rounded-2xl p-6 mb-6">
                                 <div className="text-5xl sm:text-6xl font-black text-cyan-400 mb-2">
                                     {score} <span className="text-xl sm:text-2xl text-white/50">/ {totalQuestions}</span>
                                 </div>
                                 <p className="text-base sm:text-lg">{ui.percentage}: {Math.round((score/totalQuestions)*100)}%</p>
                             </div>
+
+                            {/* Tri-Pillar Analytics Metrics Cards */}
+                            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-8">
+                                <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
+                                    <div className="text-xs text-white/60 uppercase font-semibold">Mastery</div>
+                                    <div className="text-lg sm:text-xl font-bold text-amber-400 mt-1">{masteryScore}%</div>
+                                </div>
+                                <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
+                                    <div className="text-xs text-white/60 uppercase font-semibold">Fluency</div>
+                                    <div className="text-lg sm:text-xl font-bold text-cyan-400 mt-1">{fluencyScore}%</div>
+                                </div>
+                                <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
+                                    <div className="text-xs text-white/60 uppercase font-semibold">Independence</div>
+                                    <div className="text-lg sm:text-xl font-bold text-emerald-400 mt-1">{indepScore}%</div>
+                                </div>
+                            </div>
                             
-                            <div className="flex flex-col gap-4 mt-8">
+                            <div className="flex flex-col gap-4 mt-4">
                                 <button onClick={() => { playSound('click'); setAppState('analysis'); }} className="flex items-center justify-center w-full gap-2 bg-blue-500 hover:bg-blue-400 text-slate-900 py-3 sm:py-4 rounded-xl transition-colors font-bold text-base sm:text-lg shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:-translate-y-1">
                                     <LucideIcon name="bar-chart-2" className="w-5 h-5" /> {ui.analyseBtn || T.en.analyseBtn}
                                 </button>

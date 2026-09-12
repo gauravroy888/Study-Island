@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Megaphone, X, BellRing, Sparkles } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Megaphone, X } from 'lucide-react';
 import { supabase } from '../supabase';
 
 export default function GlobalBroadcastBanner() {
@@ -21,7 +21,7 @@ export default function GlobalBroadcastBanner() {
             return true;
           }
         }
-      } catch (e) {}
+      } catch { /* ignore */ }
       return false;
     };
 
@@ -78,7 +78,7 @@ export default function GlobalBroadcastBanner() {
             setVisible(true);
           }
         };
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
 
     // 4. Supabase Realtime subscription on announcements

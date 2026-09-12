@@ -9,13 +9,27 @@
     "build:teacher": "npm run build --prefix portals/teacher",
     "build:superadmin": "npm run build --prefix portals/superadmin",
     "build:study-island": "npm run build --prefix study-island",
-    "build:all": "npm run build:admin && npm run build:student && npm run build:teacher && npm run build:superadmin && npm run build:study-island"
+    "build:all": "npm run build:admin && npm run build:student && npm run build:teacher && npm run build:superadmin && npm run build:study-island",
+    "migrate:check": "node scripts/execute-supabase-sql.js --dry-run",
+    "migrate:run": "node scripts/execute-supabase-sql.js",
+    "lint:admin": "npm run lint --prefix portals/admin",
+    "lint:student": "npm run lint --prefix portals/student",
+    "lint:teacher": "npm run lint --prefix portals/teacher",
+    "lint:superadmin": "npm run lint --prefix portals/superadmin",
+    "lint:study-island": "npm run lint --prefix study-island",
+    "lint:all": "npm run lint:admin && npm run lint:student && npm run lint:teacher && npm run lint:superadmin && npm run lint:study-island",
+    "verify:secrets": "node scripts/scan-secrets.js",
+    "verify:diff": "git diff --check",
+    "verify:quality": "npm test && npm run build:all && npm run lint:all && npm run verify:secrets && npm run verify:diff",
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1110.0",
+    "@supabase/supabase-js": "^2.116.0",
     "ws": "^8.21.3"
   },
   "devDependencies": {
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "puppeteer-core": "^25.10.0"
   }
 }

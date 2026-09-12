@@ -5,13 +5,24 @@ import {
 } from "./useAriaSession";
 import { screenCapture } from "./useScreenCapture";
 
-const MODEL = "gemini-3.5-flash-lite";
-
-function getApiKey() {
-  return localStorage.getItem("aria_gemini_key")
-      || (typeof window !== "undefined" ? window.ARIA_GEMINI_KEY : "")
-      || (import.meta.env?.VITE_GEMINI_API_KEY || "")
-      || "";
+async function getSessionToken() {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
+          const item = JSON.parse(window.localStorage.getItem(k));
+          if (item?.access_token) return item.access_token;
+        }
+      }
+      const raw = window.localStorage.getItem("sb-qmyrxvtbzlbnvzxypnus-auth-token");
+      if (raw) {
+        const item = JSON.parse(raw);
+        if (item?.access_token) return item.access_token;
+      }
+    }
+  } catch (e) {}
+  return "";
 }
 
 const MAX_HISTORY = 8;
@@ -140,15 +151,8 @@ export default function useGeminiChat() {
     const text = userText?.trim() || "";
     if (!text && !audioPayload) return null;
 
-    const apiKey = getApiKey();
-    if (!apiKey || apiKey === "YOUR_KEY_HERE" || apiKey === "YOUR_GEMINI_API_KEY") {
-      const w = "Gemini API key not set. Please provide your Gemini API key.";
-      setMessages(prev => [...prev, { role:"user", text: text || "🎤 Spoken question" }, { role:"model", text: w }]);
-      return null;
-    }
-
     const autoFrame = screenshotBase64 ?? (screenCapture.isActive() ? screenCapture.capture() : null);
-    const screen    = getDetailedScreenContext();
+    const screenContext = getDetailedScreenContext();
     const displayText = text || "🎤 (Voice question)";
 
     setMessages(prev => [...prev, { role:"user", text: displayText, hasScreenshot: !!autoFrame }]);
@@ -158,49 +162,8 @@ export default function useGeminiChat() {
     if (document.title) trackTopic(document.title);
     incrementMessages();
 
-    const userParts = [
-      { text: `[CURRENT STUDENT SCREEN CONTEXT]:\n${screen}` },
-    ];
-    if (text) {
-      userParts.push({ text });
-    } else {
-      userParts.push({ text: "The student asked the following question via microphone audio. Please listen directly to their voice audio and answer Socratically, warmly, and concisely." });
-    }
-    if (audioPayload?.data) {
-      userParts.push({
-        inline_data: {
-          mime_type: audioPayload.mimeType || "audio/webm",
-          data: audioPayload.data
-        }
-      });
-    }
-    if (autoFrame) {
-      userParts.push({ inline_data: { mime_type: "image/jpeg", data: autoFrame } });
-    }
-
     historyRef.current.push({ role: "user", parts: [{ text: displayText }] });
     if (historyRef.current.length > MAX_HISTORY) historyRef.current = historyRef.current.slice(-MAX_HISTORY);
-
-    const contents = [
-      ...historyRef.current.slice(0, -1),
-      { role: "user", parts: userParts },
-    ];
-
-    const s = getStudentInfo();
-    const sess = buildSessionContext();
-
-    const systemText =
-`You are Aria, an intelligent Socratic AI tutor for ${s.school}, tutoring ${s.name} (${s.cls}).
-${sess ? sess + "\n" : ""}
-CRITICAL CONTEXT AWARENESS:
-- You receive [CURRENT STUDENT SCREEN CONTEXT] with the student's exact active portal, page, selected menu option, and active learning chapter.
-- Always know exactly which section or option the student is looking at (e.g. Dashboard, Courses, Timetable, Light & Shadows module, 3D Study Island).
-- If the student asks "where am I?", "what is this?", or mentions an option on screen, reference their exact current option and topic accurately!
-
-RULES:
-- Provide intuitive Socratic guidance: Help the student explore concepts.
-- NO markdown asterisks (*, **), NO hashtags (#), NO bullet lists. Write in clean spoken conversational sentences.
-- Keep replies brief (under 45 words) and end with a guiding thought or encouragement.`;
 
     const streamId = ++_id;
     setMessages(prev => [...prev, { role:"model", text:"", streaming:true, id:streamId }]);
@@ -208,54 +171,49 @@ RULES:
 
     let accumulated = "";
     try {
-      const streamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
-      const res = await fetch(streamUrl, {
-        method: "POST",
+      const sessionToken = await getSessionToken();
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + sessionToken
         },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemText }] },
-          contents,
-          generationConfig: {
-            temperature: 0.5,
-            maxOutputTokens: 100,
-            topP: 0.85
-          },
-        }),
+        body: JSON.stringify({ message: text || displayText, context: screenContext })
       });
 
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
-        const errDetail = e?.error?.message || `HTTP ${res.status}`;
-        if (res.status === 401) {
-          throw new Error("Authentication failed (401). Please verify Generative Language API is enabled for this key at https://aistudio.google.com/apikey");
-        }
+        const errDetail = e?.error?.message || e?.error || e?.message || `HTTP ${res.status}`;
         throw new Error(errDetail);
       }
 
-      const reader = res.body.getReader();
-      const dec    = new TextDecoder();
-      let buf = "";
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('text/event-stream') && res.body?.getReader) {
+        const reader = res.body.getReader();
+        const dec    = new TextDecoder();
+        let buf = "";
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let nl;
-        while ((nl = buf.indexOf("\n")) !== -1) {
-          const line = buf.slice(0, nl).trim();
-          buf = buf.slice(nl + 1);
-          const tok = parseSSE(line);
-          if (tok) {
-            accumulated += tok;
-            setMessages(prev => prev.map(m => m.id === streamId ? { ...m, text: accumulated } : m));
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let nl;
+          while ((nl = buf.indexOf("\n")) !== -1) {
+            const line = buf.slice(0, nl).trim();
+            buf = buf.slice(nl + 1);
+            const tok = parseSSE(line);
+            if (tok) {
+              accumulated += tok;
+              setMessages(prev => prev.map(m => m.id === streamId ? { ...m, text: accumulated } : m));
+            }
           }
         }
+      } else {
+        const data = await res.json();
+        accumulated = data.reply || data.text || data.message || data.content || (typeof data === 'string' ? data : '');
       }
 
-      setMessages(prev => prev.map(m => m.id === streamId ? { ...m, streaming: false } : m));
+      setMessages(prev => prev.map(m => m.id === streamId ? { ...m, text: accumulated, streaming: false } : m));
       if (accumulated) historyRef.current.push({ role:"model", parts:[{ text: accumulated }] });
 
       msgCountRef.current++;

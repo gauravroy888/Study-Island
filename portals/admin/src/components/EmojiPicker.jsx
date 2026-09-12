@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, X, Smile, ThumbsUp, Heart, Sparkles, BookOpen, Coffee, Flame } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, X } from 'lucide-react';
 
 const EMOJI_CATEGORIES = [
   {
@@ -84,8 +84,6 @@ export default function EmojiPicker({ onSelectEmoji, onClose }) {
       const cat = EMOJI_CATEGORIES.find(c => c.id === activeCategory);
       return cat ? cat.emojis : [];
     }
-    const q = search.toLowerCase();
-    // Search across all categories
     const all = [];
     EMOJI_CATEGORIES.forEach(cat => {
       cat.emojis.forEach(e => {

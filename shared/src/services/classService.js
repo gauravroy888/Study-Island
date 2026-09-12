@@ -9,16 +9,14 @@ export const classService = {
 
   async getClassRoster(classId) {
     const { data, error } = await supabase
-      .from('student_enrollments')
-      .select('student_id, profiles(*)')
+      .from('class_students')
+      .select('student_id, profiles(id, auth_id, email, name, role, avatar_url, department, age)')
       .eq('class_id', classId);
     if (error) {
-      // Fallback query if enrollment table is pending
-      const { data: allProfiles, error: pErr } = await supabase.from('profiles').select('*').eq('role', 'student');
-      if (pErr) throw pErr;
-      return allProfiles || [];
+      console.error('[classService] Failed to load class roster:', error);
+      return []; // NEVER query all profiles as a fallback!
     }
-    return data ? data.map(d => d.profiles) : [];
+    return data ? data.map(d => d.profiles).filter(Boolean) : [];
   },
 
   async getLiveClasses() {

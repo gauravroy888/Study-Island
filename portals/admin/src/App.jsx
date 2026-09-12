@@ -1,15 +1,16 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import Dashboard from './views/Dashboard';
-import Events from './views/Events';
-import TimeTable from './views/TimeTable';
-import Teachers from './views/Teachers';
-import Classes from './views/Classes';
-import Communications from './views/Communications';
-import Analytics from './views/Analytics';
-import Settings from './views/Settings';
-import Notifications from './views/Notifications';
+
+const Dashboard = lazy(() => import('./views/Dashboard'));
+const Events = lazy(() => import('./views/Events'));
+const TimeTable = lazy(() => import('./views/TimeTable'));
+const Teachers = lazy(() => import('./views/Teachers'));
+const Classes = lazy(() => import('./views/Classes'));
+const Communications = lazy(() => import('./views/Communications'));
+const Analytics = lazy(() => import('./views/Analytics'));
+const Settings = lazy(() => import('./views/Settings'));
+const Notifications = lazy(() => import('./views/Notifications'));
 import { ThemeProvider } from './ThemeContext';
 import { supabase } from './supabase';
 import { PresenceProvider } from './hooks/usePresence';
@@ -87,111 +88,84 @@ class ErrorBoundary extends React.Component {
 
 export default function App() {
   const [loadingSession, setLoadingSession] = React.useState(true);
-  const [user, setUser] = React.useState(() => {
-    const adminStr = localStorage.getItem('edtech_admin_user');
-    if (adminStr) {
-      try { return JSON.parse(adminStr); } catch (e) {}
-    }
-    const userStr = localStorage.getItem('edtech_user');
-    if (userStr) {
-      try {
-        const u = JSON.parse(userStr);
-        if (u && (u.role === 'admin' || u.role === 'super_admin' || u.role === 'superadmin')) return u;
-      } catch (e) {}
-    }
-    return {
-      uid: 'admin-immersion-001',
-      email: 'immersionlabsindia@gmail.com',
-      name: 'Immersion Admin',
-      role: 'admin',
-      org: 'Delhi Public School',
-      avatar_url: 'https://api.dicebear.com/7.x/micah/svg?seed=ImmersionAdmin&backgroundColor=060a14'
-    };
-  });
+  const [user, setUser] = React.useState(null);
 
   React.useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const demoUser = urlParams.get('user');
-    if (demoUser) {
-      try {
-        const u = JSON.parse(decodeURIComponent(demoUser));
-        localStorage.setItem('edtech_admin_user', JSON.stringify(u));
-        localStorage.setItem('edtech_user', JSON.stringify(u));
-        setUser(u);
-        setLoadingSession(false);
-        return;
-      } catch (e) { console.error(e); }
-    }
-
     const verifySession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session && session.user) {
-          const userEmail = session.user.email?.toLowerCase();
-          
-          // Check profiles table for user role
-          let dbRole = null;
-          let dbName = null;
-          let dbAvatar = null;
+        if (!session || !session.user) {
+          setUser(null);
+          localStorage.removeItem('edtech_admin_user');
+          localStorage.removeItem('edtech_user');
+          setLoadingSession(false);
+          return;
+        }
 
+        const userEmail = session.user.email?.toLowerCase();
+
+        // Check profiles table for user role
+        let dbRole = null;
+        let dbName = null;
+        let dbAvatar = null;
+
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, auth_id, email, name, role, avatar_url, department, age, timetable, is_archived')
+            .eq('email', userEmail)
+            .maybeSingle();
+
+          if (profile) {
+            dbRole = profile.role;
+            dbName = profile.name;
+            dbAvatar = profile.avatar_url;
+          }
+        } catch {
+          /* ignore error */
+        }
+
+        if (!dbRole) {
           try {
-            const { data: profile } = await supabase
-              .from('profiles')
+            const { data: dbUser } = await supabase
+              .from('users')
               .select('*')
               .eq('email', userEmail)
               .maybeSingle();
 
-            if (profile) {
-              dbRole = profile.role;
-              dbName = profile.name;
-              dbAvatar = profile.avatar_url;
+            if (dbUser) {
+              dbRole = dbUser.role;
+              dbName = dbName || dbUser.full_name;
             }
-          } catch (e) {}
-
-          if (!dbRole) {
-            try {
-              const { data: dbUser } = await supabase
-                .from('users')
-                .select('*')
-                .eq('email', userEmail)
-                .maybeSingle();
-
-              if (dbUser) {
-                dbRole = dbUser.role;
-                dbName = dbName || dbUser.full_name;
-              }
-            } catch (e) {}
-          }
-
-          const fallbackAdminEmails = [
-            'immersionlabsindia@gmail.com',
-            'aimodelnewplay@gmail.com',
-            'urvashinath0409@gmail.com'
-          ];
-
-          const isKnownAdmin = fallbackAdminEmails.includes(userEmail);
-          const resolvedRole = dbRole || (isKnownAdmin ? 'admin' : 'student');
-          const resolvedName = dbName || session.user.user_metadata?.full_name || userEmail.split('@')[0];
-
-          const activeUser = {
-            uid: session.user.id,
-            email: userEmail,
-            name: resolvedName,
-            role: resolvedRole,
-            avatar_url: dbAvatar || session.user.user_metadata?.avatar_url || null
-          };
-
-          localStorage.setItem('edtech_admin_user', JSON.stringify(activeUser));
-          localStorage.setItem('edtech_user', JSON.stringify(activeUser));
-          setUser(activeUser);
-        } else {
-          const adminStr = localStorage.getItem('edtech_admin_user') || localStorage.getItem('edtech_user');
-          if (adminStr) {
-            try { setUser(JSON.parse(adminStr)); } catch (e) {}
+          } catch {
+            /* ignore error */
           }
         }
+
+        const fallbackAdminEmails = [
+          'immersionlabsindia@gmail.com',
+          'aimodelnewplay@gmail.com',
+          'urvashinath0409@gmail.com'
+        ];
+
+        const isKnownAdmin = fallbackAdminEmails.includes(userEmail);
+        const resolvedRole = dbRole || (isKnownAdmin ? 'admin' : 'student');
+        const resolvedName = dbName || session.user.user_metadata?.full_name || userEmail.split('@')[0];
+
+        const activeUser = {
+          uid: session.user.id,
+          email: userEmail,
+          name: resolvedName,
+          role: resolvedRole,
+          avatar_url: dbAvatar || session.user.user_metadata?.avatar_url || null
+        };
+
+        localStorage.setItem('edtech_admin_user', JSON.stringify(activeUser));
+        localStorage.setItem('edtech_user', JSON.stringify(activeUser));
+        setUser(activeUser);
       } catch (err) {
         console.error('Session verify error:', err);
+        setUser(null);
       } finally {
         setLoadingSession(false);
       }
@@ -201,10 +175,9 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
-        const uStr = localStorage.getItem('edtech_admin_user') || localStorage.getItem('edtech_user');
-        if (uStr) {
-          try { setUser(JSON.parse(uStr)); } catch (e) {}
-        }
+        setUser(null);
+        localStorage.removeItem('edtech_admin_user');
+        localStorage.removeItem('edtech_user');
       } else {
         verifySession();
       }
@@ -222,25 +195,12 @@ export default function App() {
     : '';
   const loginUrl = window.location.origin + repoPrefix + '/login.html';
 
-  const handleQuickAdminLogin = () => {
-    const adminUser = {
-      uid: 'admin-immersion-001',
-      email: 'immersionlabsindia@gmail.com',
-      name: 'Immersion Admin',
-      role: 'admin',
-      org: 'Delhi Public School',
-      avatar_url: 'https://api.dicebear.com/7.x/micah/svg?seed=ImmersionAdmin&backgroundColor=060a14'
-    };
-    localStorage.setItem('edtech_admin_user', JSON.stringify(adminUser));
-    localStorage.setItem('edtech_user', JSON.stringify(adminUser));
-    setUser(adminUser);
-  };
 
 
   const role = user?.role?.toLowerCase();
   const isAuthorized = user && (
-    role === 'admin' || 
-    role === 'super_admin' || 
+    role === 'admin' ||
+    role === 'super_admin' ||
     role === 'superadmin' ||
     role === 'teacher' ||
     user?.email === 'immersionlabsindia@gmail.com' ||
@@ -296,14 +256,16 @@ export default function App() {
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button
-              onClick={handleQuickAdminLogin}
+            <a
+              href={loginUrl}
               style={{
+                display: 'block',
                 width: '100%',
+                boxSizing: 'border-box',
                 padding: '14px 28px',
                 background: 'linear-gradient(135deg, var(--brand-primary, #00F0FF), var(--brand-secondary, #3B82F6))',
                 color: '#000',
-                border: 'none',
+                textDecoration: 'none',
                 borderRadius: '12px',
                 fontWeight: '800',
                 fontSize: '1rem',
@@ -312,22 +274,7 @@ export default function App() {
                 transition: 'all 0.2s ease'
               }}
             >
-              ⚡ Launch Admin Session
-            </button>
-
-            <a href={loginUrl} style={{
-              display: 'inline-block',
-              padding: '12px 28px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#cbd5e1',
-              textDecoration: 'none',
-              borderRadius: '12px',
-              fontWeight: '600',
-              fontSize: '0.9rem',
-              transition: 'all 0.2s ease'
-            }}>
-              Return to Universal Login
+              ⚡ Return to Universal Login
             </a>
           </div>
         </div>
@@ -341,18 +288,24 @@ export default function App() {
         <PresenceProvider user={user}>
           <BrowserRouter basename={import.meta.env.DEV ? '/' : '/admin'}>
             <Layout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/events" element={<Events />} />
-                <Route path="/timetable" element={<TimeTable />} />
-                <Route path="/teachers" element={<Teachers />} />
-                <Route path="/classes" element={<Classes />} />
-                <Route path="/communications" element={<Communications />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/notifications" element={<Notifications />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+              <Suspense fallback={
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: 'var(--brand-primary, #00F0FF)', fontFamily: 'Inter, system-ui, sans-serif', fontSize: '1.1rem', fontWeight: 600 }}>
+                  <span style={{ display: 'inline-block', marginRight: '10px' }}>⚡</span> Loading administration console...
+                </div>
+              }>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/events" element={<Events />} />
+                  <Route path="/timetable" element={<TimeTable />} />
+                  <Route path="/teachers" element={<Teachers />} />
+                  <Route path="/classes" element={<Classes />} />
+                  <Route path="/communications" element={<Communications />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/notifications" element={<Notifications />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
             </Layout>
           </BrowserRouter>
         </PresenceProvider>
@@ -360,4 +313,3 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-

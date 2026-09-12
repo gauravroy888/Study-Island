@@ -11,6 +11,17 @@
 (function () {
   "use strict";
 
+  // Single AI Bot Singleton guarantee: prevent nested Aria widgets inside iframe child views
+  if (typeof window !== "undefined" && window.self !== window.top) {
+    return;
+  }
+
+  // Top-level document singleton guard: prevent duplicate widgets if script loaded multiple times
+  if (typeof window !== "undefined") {
+    if (window.__aria_bot_widget_initialized__) return;
+    window.__aria_bot_widget_initialized__ = true;
+  }
+
   // ── Standalone Bot Init ───────────────────────────────────────────
 
   var MODEL   = "gemini-3.6-flash";
@@ -217,7 +228,9 @@
 
   function getStudentId() {
     var u = getStudentUser();
-    return u.id || u.uid || u.email || "guest_student";
+    // SECURITY: Never invent a synthetic identity for unauthenticated visitors.
+    // Return null if no real authenticated user is found — callers must guard on null.
+    return u.id || u.uid || null;
   }
 
   function getCtx() {
@@ -336,15 +349,44 @@
     } catch (e) { return ""; }
   }
 
+  // SECURITY: Retrieve the authenticated user's real JWT access token from the
+  // Supabase JS client localStorage entry (stored as 'sb-<ref>-auth-token').
+  // Returns null for unauthenticated visitors — never falls back to the anon key.
+  function getSupabaseAccessToken() {
+    try {
+      // Supabase JS v2 stores the session under 'sb-<projectRef>-auth-token'
+      var keys = Object.keys(localStorage);
+      for (var i = 0; i < keys.length; i++) {
+        if (keys[i].indexOf('sb-') === 0 && keys[i].indexOf('-auth-token') !== -1) {
+          var raw = localStorage.getItem(keys[i]);
+          if (!raw) continue;
+          var parsed = JSON.parse(raw);
+          var token = (parsed && parsed.access_token) ? parsed.access_token : null;
+          if (token) return token;
+        }
+      }
+      return null;
+    } catch (e) { return null; }
+  }
+
   function syncSupabaseSession(s) {
     try {
       var studentId = getStudentId();
+      // SECURITY P0-BOT-01: Do not write unauthenticated sessions to Supabase.
+      // An unauthenticated visitor has no valid student_id and must not create cloud records.
+      if (!studentId) return;
+
+      // SECURITY P0-BOT-02: Use the real user JWT access token as Bearer — never the anon key.
+      // The anon key is only a service credential (apikey header), not a user identity token.
+      var accessToken = getSupabaseAccessToken();
+      if (!accessToken) return; // No valid authenticated session — abort cloud sync
+
       fetch(SUPABASE_URL + "/rest/v1/aria_ai_sessions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "apikey": SUPABASE_ANON_KEY,
-          "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+          "Authorization": "Bearer " + accessToken,
           "Prefer": "resolution=merge-duplicates"
         },
         body: JSON.stringify({

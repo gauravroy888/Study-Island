@@ -1,9 +1,9 @@
-import React from 'react';
 import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import GlobalBroadcastBanner from './GlobalBroadcastBanner';
 import { useTheme } from '../ThemeContext';
-import { ExternalLink, ShieldCheck } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
+import FullscreenButton from './FullscreenButton';
 import './Layout.css';
 
 const PAGE_TITLES = {
@@ -14,14 +14,12 @@ const PAGE_TITLES = {
   '/classes': 'Class & Section Management',
   '/communications': 'Communications Hub',
   '/analytics': 'Institutional Performance Analytics',
-  '/settings': 'System & Institution Settings',
+  '/settings': 'System & Institutional Settings',
   '/notifications': 'Notification Center'
 };
 
-import FullscreenButton from './FullscreenButton';
-
 export default function Layout({ children }) {
-  const { backgroundImage, profileName, profileDesignation, schoolName, primaryColor } = useTheme();
+  const { backgroundImage, profileDesignation, schoolName } = useTheme();
   const location = useLocation();
   const currentTitle = PAGE_TITLES[location.pathname] || 'Admin Portal';
 

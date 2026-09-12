@@ -1,23 +1,23 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Card from '../components/Card';
 import { Save, Image as ImageIcon, User, Upload } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
-const defaultAvatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=Teacher&backgroundColor=b6e3f4';
 import defaultBg from '../assets/milky-way-starry-sky2k.jpg';
 import ProfilePhotoModal from '../components/ProfilePhotoModal';
+import { supabase } from '../supabase';
 
 export default function Settings() {
   const { 
     profileName, setProfileName, 
     profileDesignation, setProfileDesignation,
-    profileImage, setProfileImage,
+    profileImage,
     backgroundImage, setBackgroundImage 
   } = useTheme();
 
   const getAuthUser = () => {
     try {
       return JSON.parse(localStorage.getItem('edtech_user') || 'null');
-    } catch (e) { return null; }
+    } catch { return null; }
   };
   const authUser = getAuthUser();
 
@@ -39,7 +39,6 @@ export default function Settings() {
       if (user) {
         user.name = localName;
         localStorage.setItem('edtech_user', JSON.stringify(user));
-        const { supabase } = await import('../supabase');
         await supabase.from('profiles').update({ name: localName }).eq('email', user.email);
         await supabase.from('teachers').update({ name: localName, degree: localDesignation }).eq('email', user.email);
       }
@@ -75,12 +74,6 @@ export default function Settings() {
     border: '1px solid var(--panel-border)', 
     color: 'white',
     outline: 'none'
-  };
-
-  const selectStyle = {
-    ...inputStyle,
-    appearance: 'none',
-    cursor: 'pointer'
   };
 
   const uploadBtnStyle = {

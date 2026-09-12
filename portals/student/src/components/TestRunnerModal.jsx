@@ -1,7 +1,40 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, CheckCircle2, AlertTriangle, ArrowRight, ArrowLeft, Send, Check, X, Award, HelpCircle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Clock, CheckCircle2, AlertTriangle, ArrowRight, ArrowLeft, Send, X, Award } from 'lucide-react';
 import { supabase } from '../supabase';
 import './TestRunnerModal.css';
+
+const DEFAULT_QUESTIONS = [
+  {
+    id: 1,
+    text: 'What happens when light rays strike an opaque object?',
+    options: [
+      { id: 'a', text: 'Light passes completely through without deviation', isCorrect: false },
+      { id: 'b', text: 'Light is absorbed and blocked, forming a dark shadow behind it', isCorrect: true },
+      { id: 'c', text: 'Light speed doubles inside the medium', isCorrect: false },
+      { id: 'd', text: 'Light reflects infinitely inside the object', isCorrect: false }
+    ]
+  },
+  {
+    id: 2,
+    text: 'Which region of a shadow is completely dark where no light from the source reaches?',
+    options: [
+      { id: 'a', text: 'Penumbra', isCorrect: false },
+      { id: 'b', text: 'Antumbra', isCorrect: false },
+      { id: 'c', text: 'Umbra', isCorrect: true },
+      { id: 'd', text: 'Refraction Zone', isCorrect: false }
+    ]
+  },
+  {
+    id: 3,
+    text: 'What type of propagation describes light traveling strictly in straight lines?',
+    options: [
+      { id: 'a', text: 'Curvilinear Propagation', isCorrect: false },
+      { id: 'b', text: 'Rectilinear Propagation of Light', isCorrect: true },
+      { id: 'c', text: 'Wave Interference', isCorrect: false },
+      { id: 'd', text: 'Quantum Teleportation', isCorrect: false }
+    ]
+  }
+];
 
 export default function TestRunnerModal({ test, onClose, onComplete }) {
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -14,54 +47,7 @@ export default function TestRunnerModal({ test, onClose, onComplete }) {
   const [scoreResult, setScoreResult] = useState(null);
   const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
 
-  const questions = test.questions || [
-    {
-      id: 1,
-      text: 'What happens when light rays strike an opaque object?',
-      options: [
-        { id: 'a', text: 'Light passes completely through without deviation', isCorrect: false },
-        { id: 'b', text: 'Light is absorbed and blocked, forming a dark shadow behind it', isCorrect: true },
-        { id: 'c', text: 'Light speed doubles inside the medium', isCorrect: false },
-        { id: 'd', text: 'Light reflects infinitely inside the object', isCorrect: false }
-      ]
-    },
-    {
-      id: 2,
-      text: 'Which region of a shadow is completely dark where no light from the source reaches?',
-      options: [
-        { id: 'a', text: 'Penumbra', isCorrect: false },
-        { id: 'b', text: 'Antumbra', isCorrect: false },
-        { id: 'c', text: 'Umbra', isCorrect: true },
-        { id: 'd', text: 'Refraction Zone', isCorrect: false }
-      ]
-    },
-    {
-      id: 3,
-      text: 'What type of propagation describes light traveling strictly in straight lines?',
-      options: [
-        { id: 'a', text: 'Curvilinear Propagation', isCorrect: false },
-        { id: 'b', text: 'Rectilinear Propagation of Light', isCorrect: true },
-        { id: 'c', text: 'Wave Interference', isCorrect: false },
-        { id: 'd', text: 'Quantum Teleportation', isCorrect: false }
-      ]
-    }
-  ];
-
-  // Timer countdown
-  useEffect(() => {
-    if (isSubmitted) return;
-    const interval = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          handleSubmitTest();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isSubmitted]);
+  const questions = test.questions || DEFAULT_QUESTIONS;
 
   const formatTime = (secs) => {
     const m = Math.floor(secs / 60);
@@ -77,7 +63,7 @@ export default function TestRunnerModal({ test, onClose, onComplete }) {
     setAnswers(prev => ({ ...prev, [qIdx]: text }));
   };
 
-  const handleSubmitTest = async () => {
+  const handleSubmitTest = useCallback(async () => {
     setShowConfirmSubmit(false);
     
     // Calculate Score for MCQs
@@ -137,7 +123,6 @@ export default function TestRunnerModal({ test, onClose, onComplete }) {
         details: `Student ${currentUser.name} scored ${percentage}% (${correctCount}/${totalGraded}) on ${test.title}`,
         source: 'Student Test Runner',
         actor_email: currentUser.email,
-        school_id: 'inst-dps-001',
         metadata: result
       });
     } catch (err) {
@@ -147,7 +132,23 @@ export default function TestRunnerModal({ test, onClose, onComplete }) {
     if (onComplete) {
       onComplete(result);
     }
-  };
+  }, [questions, answers, test, onComplete]);
+
+  // Timer countdown
+  useEffect(() => {
+    if (isSubmitted) return;
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          void handleSubmitTest();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isSubmitted, handleSubmitTest]);
 
   const currentQ = questions[currentIdx];
   const isLastQuestion = currentIdx === questions.length - 1;

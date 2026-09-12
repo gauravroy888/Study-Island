@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, BookOpen, Calendar, Video, MessageSquare, Users, BarChart2, Bell, Settings as SettingsIcon, Camera } from 'lucide-react';
 import { useTheme } from '../ThemeContext';

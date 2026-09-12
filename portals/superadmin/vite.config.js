@@ -1,12 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
   base: './',
+  resolve: {
+    alias: {
+      '@supabase/supabase-js': path.resolve(import.meta.dirname, 'node_modules/@supabase/supabase-js')
+    }
+  },
   build: {
     outDir: '../../superadmin',
-    emptyOutDir: false,
+    emptyOutDir: true,
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {

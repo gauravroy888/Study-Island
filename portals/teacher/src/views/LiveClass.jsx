@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Card from '../components/Card';
-import { Video, Calendar as CalendarIcon, Clock, Link as LinkIcon, Edit2, Play, CheckCircle, ExternalLink, Trash2, X, Plus, FileText, Loader2 } from 'lucide-react';
+import { Video, Calendar as CalendarIcon, Clock, Link as LinkIcon, Play, CheckCircle, ExternalLink, Trash2, FileText, Loader2 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useGoogleLogin } from '@react-oauth/google';
 import CreateMCQTest from '../components/CreateMCQTest';
@@ -21,17 +21,19 @@ export default function LiveClass() {
   
   // Form State
   const [classTitle, setClassTitle] = useState('General Session');
-  const [selectedClass, setSelectedClass] = useState('Class 1st');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedClass, setSelectedClass] = useState('Class 6th');
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('10:00');
   const [duration, setDuration] = useState('60'); // minutes
 
-  const [classesList, setClassesList] = useState(['Class 1st', 'Class 2nd', 'Class 3rd', 'Class 4th', 'Class 5th', 'Class 6th']);
+  const [classesList, setClassesList] = useState(['Class 6th']);
 
   useEffect(() => {
-    supabase.from('classes').select('name').then(({ data, error }) => {
+    supabase.from('classes').select('name').eq('name', 'Class 6th').eq('is_archived', false).then(({ data, error }) => {
       if (!error && data && data.length > 0) {
         setClassesList(data.map(c => c.name));
+      } else {
+        setClassesList(['Class 6th']);
       }
     }).catch(() => {});
   }, []);
@@ -39,29 +41,40 @@ export default function LiveClass() {
   const [testsList, setTestsList] = useState([]);
   const [isLoadingTests, setIsLoadingTests] = useState(false);
 
-  useEffect(() => {
-    fetchActiveClasses();
-    fetchUpcomingClasses();
-    fetchTests();
-  }, []);
-
-  const fetchActiveClasses = async () => {
-    const { data, error } = await supabase.from('live_classes').select('*').eq('status', 'active');
+  const fetchActiveClasses = useCallback(async () => {
+    const { data } = await supabase.from('live_classes').select('*').eq('status', 'active');
     if (data && data.length > 0) setActiveLiveClass(data[0]);
     else setActiveLiveClass(null);
-  };
+  }, []);
 
-  const fetchUpcomingClasses = async () => {
-    const { data, error } = await supabase.from('live_classes').select('*').eq('status', 'scheduled').order('start_time', { ascending: true });
+  const fetchUpcomingClasses = useCallback(async () => {
+    const { data } = await supabase.from('live_classes').select('*').eq('status', 'scheduled').order('start_time', { ascending: true });
     if (data) setUpcomingClasses(data);
-  };
+  }, []);
 
-  const fetchTests = async () => {
+  const fetchTests = useCallback(async () => {
     setIsLoadingTests(true);
-    const { data, error } = await supabase.from('tests').select('*').order('created_at', { ascending: false });
-    if (data && !error) setTestsList(data);
-    setIsLoadingTests(false);
-  };
+    try {
+      const { data, error } = await supabase.from('tests').select('*').order('created_at', { ascending: false });
+      if (data && !error) setTestsList(data);
+    } finally {
+      setIsLoadingTests(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const init = async () => {
+      if (!isMounted) return;
+      await fetchActiveClasses();
+      if (!isMounted) return;
+      await fetchUpcomingClasses();
+      if (!isMounted) return;
+      await fetchTests();
+    };
+    void init();
+    return () => { isMounted = false; };
+  }, [fetchActiveClasses, fetchUpcomingClasses, fetchTests]);
 
   const login = useGoogleLogin({
     onSuccess: (codeResponse) => {
@@ -119,7 +132,7 @@ export default function LiveClass() {
 
       // Save to Supabase
       const currentUser = JSON.parse(localStorage.getItem('edtech_user') || '{}');
-      const { data: dbData, error: dbError } = await supabase.from('live_classes').insert([{
+      const { error: dbError } = await supabase.from('live_classes').insert([{
         title: classTitle,
         class_name: selectedClass,
         meet_link: data.hangoutLink,

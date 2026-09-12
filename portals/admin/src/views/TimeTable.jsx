@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, Calendar, BookOpen, User, MapPin, Plus, Download, Check, Loader2, Edit2, Trash2, X, Save, Sparkles } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Clock, User, MapPin, Download, Check, Loader2, Edit2, X, Save, Sparkles } from 'lucide-react';
 import Card from '../components/Card';
 import { supabase } from '../supabase';
 import { usePresence } from '../hooks/usePresence';
@@ -28,7 +28,6 @@ export default function TimeTable() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingSlot, setEditingSlot] = useState(null);
   const [formData, setFormData] = useState({
     class_name: 'Class 6th',
     day: 'Monday',
@@ -40,52 +39,62 @@ export default function TimeTable() {
     type: '3D Simulation'
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Fetch real classes
+      // 1. Fetch real teachers from profiles table
+      const { data: profData } = await supabase
+        .from('profiles')
+        .select('id, auth_id, email, name, role, avatar_url, department, age, timetable, is_archived')
+        .eq('role', 'teacher')
+        .order('name', { ascending: true });
+
+      const teachers = (profData || []).map(p => ({
+        name: p.name || p.full_name || p.username || 'Faculty Member',
+        email: p.email || 'N/A'
+      }));
+
+      // Fallback if none in profiles:
+      if (teachers.length > 0) {
+        setDbTeachersList(teachers);
+      } else {
+        setDbTeachersList([
+          { name: 'Gaurav', email: 'gauravroy476@gmail.com' },
+          { name: 'Harsh', email: 'harsh@example.com' }
+        ]);
+      }
+
+      // 2. Fetch real classes from classes table
       const { data: dbClasses } = await supabase
         .from('classes')
-        .select('*')
+        .select('name')
         .order('display_order', { ascending: true });
 
       if (dbClasses && dbClasses.length > 0) {
-        setClassesList(dbClasses.map(c => c.name));
+        const names = dbClasses.map(c => c.name);
+        setClassesList(names);
+        setSelectedClass(prev => !names.includes(prev) ? names[0] : prev);
       }
 
-      // 2. Fetch real teachers
-      const { data: dbUsers } = await supabase
-        .from('users')
-        .select('*');
+      // 3. Fetch courses/subjects from courses table
+      const { data: dbCourses } = await supabase
+        .from('courses')
+        .select('title')
+        .order('title', { ascending: true });
 
-      const teachers = (dbUsers && dbUsers.length > 0)
-        ? dbUsers.map(u => ({
-            name: u.full_name || u.name || u.email.split('@')[0],
-            email: u.email
-          }))
-        : [
-            { name: 'Gaurav', email: 'gauravroy476@gmail.com' },
-            { name: 'Harsh Pratap Singh', email: 'rathorehps@gmail.com' }
-          ];
-      setDbTeachersList(teachers);
+      if (dbCourses && dbCourses.length > 0) {
+        setDbSubjectsList(dbCourses.map(c => c.title));
+      } else {
+        setDbSubjectsList(['Physics', 'Mathematics', 'Social Studies', 'Computer Science']);
+      }
 
-      // 3. Fetch real subjects
-      const { data: dbSubjects } = await supabase
-        .from('subjects')
-        .select('*');
-
-      const subjects = (dbSubjects && dbSubjects.length > 0)
-        ? [...new Set(dbSubjects.map(s => s.name))]
-        : ['Science', 'Mathematics', 'History', 'Geography', 'English', 'Physics', 'Chemistry'];
-      setDbSubjectsList(subjects);
-
-      // 4. Fetch timetables from Supabase
-      const { data: dbTimetables, error: ttError } = await supabase
+      // 4. Fetch saved timetable entries
+      const { data: dbTimetable } = await supabase
         .from('timetables')
         .select('*');
 
-      if (!ttError && dbTimetables) {
-        setTimetableData(dbTimetables);
+      if (dbTimetable && dbTimetable.length > 0) {
+        setTimetableData(dbTimetable);
       } else {
         setTimetableData([]);
       }
@@ -94,18 +103,32 @@ export default function TimeTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await loadData();
+    };
+    void init();
+    return () => {
+      isMounted = false;
+    };
+  }, [loadData]);
 
   // Listen to WebSocket broadcasts
   useEffect(() => {
+    let isMounted = true;
     if (lastMessage?.type === 'timetable_update') {
-      loadData();
+      const sync = async () => {
+        if (isMounted) await loadData();
+      };
+      void sync();
     }
-  }, [lastMessage]);
+    return () => {
+      isMounted = false;
+    };
+  }, [lastMessage, loadData]);
 
   // Filter current day & class periods
   const currentPeriods = TIME_SLOTS.map((slot, idx) => {
@@ -131,7 +154,6 @@ export default function TimeTable() {
 
 
   const handleOpenAddModal = (slot) => {
-    setEditingSlot(slot);
     const matchedTeacher = dbTeachersList.find(t => t.email === slot.teacher_email) || dbTeachersList[0] || { name: 'Gaurav', email: 'gauravroy476@gmail.com' };
 
     setFormData({
@@ -165,6 +187,10 @@ export default function TimeTable() {
       const { error } = await supabase
         .from('timetables')
         .upsert([updatedItem], { onConflict: 'class_name,day,time_slot' });
+
+      if (error) {
+        console.warn('Timetable upsert warning:', error.message);
+      }
 
       // Update local state immediately
       setTimetableData(prev => {

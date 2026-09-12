@@ -1,0 +1,764 @@
+{
+  "chapter_id": "SCI6-CH10",
+  "chapter_title": "Chapter 10: Light, Shadows and Optics",
+  "grade": 6,
+  "subject": "Science",
+  "sections": [
+    {
+      "id": "see_things",
+      "title": "How We See Things",
+      "lo_id": "SCI6-CH10-S01-LO01",
+      "lo_title": "Rectilinear Propagation & Reflection",
+      "icon": "eye",
+      "questions": [
+        {
+          "id": "q1_1",
+          "text": "If you are placed in a completely dark room containing a polished mirror and a red apple, what will you see?",
+          "options": [
+            "The mirror only, because its surface is highly reflective",
+            "The apple only, because red is a high-visibility wavelength",
+            "Neither object, because vision requires light to enter the eye",
+            "Both objects dimly, once your eyes adapt to the darkness"
+          ],
+          "correct": 2,
+          "bloom_level": "apply",
+          "difficulty": "medium",
+          "lo_id": "SCI6-CH10-S01-LO01",
+          "lo_title": "Rectilinear Propagation & Reflection",
+          "hint": "Consider what physical stimulus the retina requires to form an image.",
+          "explanation": "Vision strictly requires light rays from a luminous source or reflected off an illuminated object to enter the pupil. In total darkness, no photons exist to reflect into the eye.",
+          "icon": "eye"
+        },
+        {
+          "id": "q1_2",
+          "text": "Why is it impossible to see around a sharp 90-degree corner without a mirror, even in bright daylight?",
+          "options": [
+            "Visible light rays travel strictly in straight lines (rectilinear propagation)",
+            "Ambient air molecules bend light rays backward before they turn",
+            "Human retinas cannot focus on angled light beams",
+            "Obstacles slow light down until it loses energy"
+          ],
+          "correct": 0,
+          "bloom_level": "understand",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S01-LO01",
+          "lo_title": "Rectilinear Propagation & Reflection",
+          "hint": "Think about the geometric path light rays take in a uniform medium.",
+          "explanation": "Light travels in straight lines through a homogeneous medium. Because it cannot bend around opaque physical obstructions on its own, corners block the direct optical path to our eyes.",
+          "icon": "corner-up-right"
+        },
+        {
+          "id": "q1_3",
+          "text": "Which of the following celestial objects is a non-luminous body that is visible only because it reflects sunlight?",
+          "options": [
+            "The Sun",
+            "A distant star",
+            "The Moon",
+            "A glowing meteoroid"
+          ],
+          "correct": 2,
+          "bloom_level": "remember",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S01-LO01",
+          "lo_title": "Rectilinear Propagation & Reflection",
+          "hint": "Which body does not generate thermonuclear or chemical light of its own?",
+          "explanation": "The Moon does not produce its own light; it is an illuminated opaque body that reflects sunlight toward the Earth.",
+          "icon": "moon"
+        },
+        {
+          "id": "q1_4",
+          "text": "How does a submarine periscope allow a submerged crew to observe surface ships?",
+          "options": [
+            "It bends light rays using high-pressure optical fluid lenses",
+            "It uses two plane mirrors oriented parallel at 45-degree angles to bounce light downward",
+            "It magnifies sound waves into visible optical wavelengths",
+            "It polarizes ambient sea water to make it transparent"
+          ],
+          "correct": 1,
+          "bloom_level": "apply",
+          "difficulty": "medium",
+          "lo_id": "SCI6-CH10-S01-LO01",
+          "lo_title": "Rectilinear Propagation & Reflection",
+          "hint": "Recall the law of reflection: angle of incidence equals angle of reflection on two parallel mirrors.",
+          "explanation": "A periscope utilizes two parallel plane mirrors fixed at 45° to the tube's axis. Surface light strikes the top mirror, reflects 90° down the tube, and reflects another 90° off the bottom mirror into the observer's eye.",
+          "icon": "telescope"
+        },
+        {
+          "id": "q1_5",
+          "text": "If a shirt that appears pure blue under white daylight is illuminated solely by pure monochromatic red light, what color will it appear?",
+          "options": [
+            "Bright red",
+            "Deep blue",
+            "Vibrant purple",
+            "Black"
+          ],
+          "correct": 3,
+          "bloom_level": "analyze",
+          "difficulty": "hard",
+          "lo_id": "SCI6-CH10-S01-LO01",
+          "lo_title": "Rectilinear Propagation & Reflection",
+          "hint": "A blue dye absorbs red photons and only reflects blue wavelengths.",
+          "explanation": "A blue pigment reflects blue wavelengths and absorbs all other visible wavelengths (including red). In the absence of blue light, all incoming red light is absorbed, resulting in zero reflected light — hence the shirt appears black.",
+          "icon": "palette"
+        },
+        {
+          "id": "q1_6",
+          "text": "Why is a green laser pointer beam clearly visible traversing across a smoky room, but completely invisible in filtered clean air?",
+          "options": [
+            "Smoke particles actively generate their own green photons",
+            "Suspended airborne smoke particles scatter a fraction of the laser light toward the observer's eyes",
+            "Clean air absorbs 100% of visible laser radiation",
+            "Smoke accelerates photons beyond their normal speed"
+          ],
+          "correct": 1,
+          "bloom_level": "understand",
+          "difficulty": "medium",
+          "lo_id": "SCI6-CH10-S01-LO01",
+          "lo_title": "Rectilinear Propagation & Reflection",
+          "hint": "To see a light beam from the side, light must be redirected into your eyes.",
+          "explanation": "In clean air, laser photons travel in an uninterrupted straight line away from you. Smoke or dust particles cause diffuse scattering (Tyndall effect), redirecting some photons into your retina so the beam path becomes visible.",
+          "icon": "wind"
+        },
+        {
+          "id": "q1_7",
+          "text": "Which anatomical structure of the human eye serves as the light-sensitive projection screen where inverted images are focused?",
+          "options": [
+            "The cornea",
+            "The crystalline lens",
+            "The retina",
+            "The pupil"
+          ],
+          "correct": 2,
+          "bloom_level": "remember",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S01-LO01",
+          "lo_title": "Rectilinear Propagation & Reflection",
+          "hint": "It is lined with photoreceptor rods and cones at the back of the eyeball.",
+          "explanation": "The retina is the neuro-sensory tissue coating the back of the eyeball. The cornea and lens focus light rays onto the retina, converting photon energy into electrical signals for the optic nerve.",
+          "icon": "eye"
+        },
+        {
+          "id": "q1_8",
+          "text": "Why does the human pupil involuntarily dilate (expand) when entering a dimly lit auditorium?",
+          "options": [
+            "To relax the ciliary muscles and decrease focal length",
+            "To maximize the aperture and allow more ambient photons to reach the retina",
+            "To change the color balance of peripheral vision",
+            "To prevent corneal drying in low humidity"
+          ],
+          "correct": 1,
+          "bloom_level": "understand",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S01-LO01",
+          "lo_title": "Rectilinear Propagation & Reflection",
+          "hint": "Think of the pupil like the adjustable aperture of a camera lens.",
+          "explanation": "The iris relaxes the pupil aperture in low-light environments so that a greater amount of available light can strike the retinal photoreceptors, enhancing low-light sensitivity.",
+          "icon": "maximize"
+        },
+        {
+          "id": "q1_9",
+          "text": "Why does a flat, polished silver surface create a crisp mirror image, whereas a crumpled sheet of silver foil creates only a diffuse glare?",
+          "options": [
+            "The flat mirror reflects all incoming parallel rays in parallel alignment (specular reflection), while the foil bounces rays in random directions (diffuse reflection)",
+            "The foil absorbs 90% of visible light while the mirror absorbs zero",
+            "The flat mirror converts light waves into laser coherence",
+            "Foil has a microscopic chemical film that destroys photon wavelengths"
+          ],
+          "correct": 0,
+          "bloom_level": "analyze",
+          "difficulty": "hard",
+          "lo_id": "SCI6-CH10-S01-LO01",
+          "lo_title": "Rectilinear Propagation & Reflection",
+          "hint": "Consider what happens to parallel incoming rays when surface normals point in random directions.",
+          "explanation": "Specular reflection occurs on smooth surfaces where parallel rays bounce off parallel surface normals. Crumpled foil has microscopic peaks and troughs, dispersing reflected rays irregularly into diffuse scattering.",
+          "icon": "sparkles"
+        },
+        {
+          "id": "q1_10",
+          "text": "When a straight pencil is submerged partially into a glass tumbler of water, it appears broken or bent at the air-water boundary. What causes this phenomenon?",
+          "options": [
+            "The water physically exerts mechanical force that flexes the pencil wood",
+            "Light changes speed and bends as it traverses the boundary between media of different optical densities (refraction)",
+            "Water molecules reflect all light before it reaches the surface",
+            "The cylindrical glass acts as an opaque barrier"
+          ],
+          "correct": 1,
+          "bloom_level": "understand",
+          "difficulty": "medium",
+          "lo_id": "SCI6-CH10-S01-LO01",
+          "lo_title": "Rectilinear Propagation & Reflection",
+          "hint": "Think of light changing speed as it travels through denser liquid.",
+          "explanation": "Light travels slower in water than in air. When light rays from the pencil cross from water into air at an angle, they change velocity and bend away from the normal (refraction), making the pencil appear displaced.",
+          "icon": "droplets"
+        }
+      ]
+    },
+    {
+      "id": "materials",
+      "title": "Materials: Transparent, Translucent & Opaque",
+      "lo_id": "SCI6-CH10-S02-LO02",
+      "lo_title": "Light Transmission & Material Classification",
+      "icon": "box",
+      "questions": [
+        {
+          "id": "q2_1",
+          "text": "Why are commercial restroom windows frequently manufactured using frosted or textured glass rather than clear plate glass?",
+          "options": [
+            "Frosted glass is significantly stronger and shatterproof",
+            "It is translucent, allowing daylight in while diffusing rays so shapes cannot be distinguished",
+            "It is 100% opaque, preventing all light transmission",
+            "It absorbs UV rays to keep the interior cooler"
+          ],
+          "correct": 1,
+          "bloom_level": "apply",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S02-LO02",
+          "lo_title": "Light Transmission & Material Classification",
+          "hint": "Think about balancing privacy with natural illumination.",
+          "explanation": "Translucent materials allow light to transmit through them but scatter the rays in multiple directions, maintaining privacy by blurring recognizable silhouettes while keeping the room lit.",
+          "icon": "box"
+        },
+        {
+          "id": "q2_2",
+          "text": "An agricultural engineer is designing a commercial greenhouse for growing tomatoes. Which material should be selected for the roof panels?",
+          "options": [
+            "Treated plywood sheets",
+            "Heavy corrugated cardboard",
+            "Clear float glass or transparent polycarbonate sheets",
+            "Opaque black vinyl sheeting"
+          ],
+          "correct": 2,
+          "bloom_level": "apply",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S02-LO02",
+          "lo_title": "Light Transmission & Material Classification",
+          "hint": "Crops require maximum uninterrupted photosynthetic active radiation (PAR).",
+          "explanation": "Transparent materials permit almost complete transmission of visible light without substantial scattering or absorption, providing the high flux of direct sunlight plants require for photosynthesis.",
+          "icon": "sun"
+        },
+        {
+          "id": "q2_3",
+          "text": "Which of the following objects is strictly classified as an opaque material?",
+          "options": [
+            "A clean sheet of cellophane film",
+            "A slab of seasoned oak wood",
+            "A thin sheet of tracing paper",
+            "A beaker of pure distilled water"
+          ],
+          "correct": 1,
+          "bloom_level": "remember",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S02-LO02",
+          "lo_title": "Light Transmission & Material Classification",
+          "hint": "An opaque object allows zero visible light to pass through.",
+          "explanation": "Wood is an opaque solid. It either absorbs or reflects all incident visible light, allowing no photons to transmit through its thickness.",
+          "icon": "door-closed"
+        },
+        {
+          "id": "q2_4",
+          "text": "At oceanic depths beyond 1,000 meters (the aphotic bathypelagic zone), perpetual complete darkness reigns. What does this reveal about transparent liquids in large volumes?",
+          "options": [
+            "Water molecules lose transparency and turn into opaque black particles under hydrostatic pressure",
+            "Even transparent substances absorb a small fraction of light per meter; over great depths, cumulative absorption extinguishes all visible light",
+            "Deep ocean water conducts light faster until it radiates away into the mantle",
+            "Cold saline water acts as a total internal reflector"
+          ],
+          "correct": 1,
+          "bloom_level": "analyze",
+          "difficulty": "hard",
+          "lo_id": "SCI6-CH10-S02-LO02",
+          "lo_title": "Light Transmission & Material Classification",
+          "hint": "Transparency is not 100% loss-free. Even clear water absorbs fractional photon energy per unit distance.",
+          "explanation": "Transparency is a gradient. Pure water absorbs and scatters small amounts of photons across its path length. At depth, cumulative attenuation extinguishes sunlight completely, rendering deep ocean water effectively opaque.",
+          "icon": "waves"
+        },
+        {
+          "id": "q2_5",
+          "text": "Waxed parchment paper and butter paper allow light to pass through diffusely, but objects behind them cannot be seen clearly. These materials are classified as:",
+          "options": [
+            "Transparent",
+            "Translucent",
+            "Opaque",
+            "Luminescent"
+          ],
+          "correct": 1,
+          "bloom_level": "remember",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S02-LO02",
+          "lo_title": "Light Transmission & Material Classification",
+          "hint": "Between transparent (crystal clear) and opaque (no light).",
+          "explanation": "Translucent substances allow partial transmission of light but internally scatter the rays so that clear images cannot be resolved through them.",
+          "icon": "scroll"
+        },
+        {
+          "id": "q2_6",
+          "text": "Why do automotive safety regulations strictly mandate transparent laminated glass for front windshields rather than tinted translucent panels?",
+          "options": [
+            "Translucent panels make the car cabin too hot during summer",
+            "Translucent panels scatter light, destroying spatial resolution and road hazard contrast needed for safe driving",
+            "Transparent glass is less dense and weighs less",
+            "Translucent materials block radio and cellular signals"
+          ],
+          "correct": 1,
+          "bloom_level": "understand",
+          "difficulty": "medium",
+          "lo_id": "SCI6-CH10-S02-LO02",
+          "lo_title": "Light Transmission & Material Classification",
+          "hint": "Drivers need undistorted, sharp geometric detail at high speeds.",
+          "explanation": "Translucent materials produce diffuse scattering, which obliterates sharp contours and distance perception. A windshield must be optically transparent to provide undistorted visual telemetry of the roadway.",
+          "icon": "car"
+        },
+        {
+          "id": "q2_7",
+          "text": "When placed into a uniform beam of light, which of the following objects will cast the darkest, most distinct shadow on a white screen?",
+          "options": [
+            "A clean optical glass lens",
+            "A piece of paraffin wax paper",
+            "A solid cast-iron block of identical dimensions",
+            "A clear polyethylene water bottle"
+          ],
+          "correct": 2,
+          "bloom_level": "apply",
+          "difficulty": "medium",
+          "lo_id": "SCI6-CH10-S02-LO02",
+          "lo_title": "Light Transmission & Material Classification",
+          "hint": "The darkest shadow requires complete blockage of light rays without transmission.",
+          "explanation": "A cast-iron block is completely opaque, absorbing or reflecting 100% of incident light and leaving a completely blocked umbral region on the screen.",
+          "icon": "box"
+        },
+        {
+          "id": "q2_8",
+          "text": "If you coat the exterior of a clear transparent glass jar with several thick coats of black acrylic enamel, its optical property transitions from:",
+          "options": [
+            "Transparent to translucent",
+            "Translucent to transparent",
+            "Transparent to opaque",
+            "Opaque to translucent"
+          ],
+          "correct": 2,
+          "bloom_level": "understand",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S02-LO02",
+          "lo_title": "Light Transmission & Material Classification",
+          "hint": "Black paint absorbs virtually all visible photons.",
+          "explanation": "Clear glass is transparent. Applying thick black pigment introduces an opaque barrier layer that absorbs all incident photons, converting the object to an opaque container.",
+          "icon": "brush"
+        },
+        {
+          "id": "q2_9",
+          "text": "Why do lighting designers place translucent fabric or frosted acrylic diffusers around bare filament bulbs?",
+          "options": [
+            "To increase the total lumen output of the bulb",
+            "To scatter intense point-source light uniformly across a broader surface, eliminating harsh glare",
+            "To convert visible light into infrared radiant heat",
+            "To make the light pulse at higher frequencies"
+          ],
+          "correct": 1,
+          "bloom_level": "apply",
+          "difficulty": "medium",
+          "lo_id": "SCI6-CH10-S02-LO02",
+          "lo_title": "Light Transmission & Material Classification",
+          "hint": "Direct concentrated bulbs cause glare; diffuse scattering softens illumination.",
+          "explanation": "Bare bulbs act as high-luminance point sources that cause visual glare and sharp, harsh shadows. A translucent shade scatters the transmitted light into an extended, comfortable diffuse source.",
+          "icon": "lamp"
+        },
+        {
+          "id": "q2_10",
+          "text": "When standing in a lit room at night looking out through a clear glass window into the dark outdoors, you see a faint reflection of yourself. What does this demonstrate?",
+          "options": [
+            "Glass is an opaque substance that only pretends to be clear in daylight",
+            "Materials can exhibit both partial transmission (transparency) and partial reflection simultaneously at optical boundaries",
+            "Night air pushes photons back into the glass",
+            "The glass has absorbed all external colors"
+          ],
+          "correct": 1,
+          "bloom_level": "analyze",
+          "difficulty": "hard",
+          "lo_id": "SCI6-CH10-S02-LO02",
+          "lo_title": "Light Transmission & Material Classification",
+          "hint": "Notice that about 4-8% of light is reflected at glass-air interfaces while the rest transmits.",
+          "explanation": "At dielectric boundaries (like air-to-glass), Fresnel reflection causes ~4% of light to reflect back while ~96% transmits. When the outside is dark, the reflected interior light is not washed out by external sunlight and becomes easily visible.",
+          "icon": "sparkles"
+        }
+      ]
+    },
+    {
+      "id": "shadows",
+      "title": "Formation of Shadows & Ray Geometry",
+      "lo_id": "SCI6-CH10-S03-LO03",
+      "lo_title": "Umbra, Penumbra & Shadow Sizing",
+      "icon": "sun",
+      "questions": [
+        {
+          "id": "q3_1",
+          "text": "As a person walks steadily toward and then directly beneath an overhead streetlamp at night, how does their cast shadow evolve?",
+          "options": [
+            "It continuously lengthens and stays ahead of them",
+            "It shortens as they approach the lamp, shrinks beneath them, and then lengthens behind them as they walk away",
+            "It remains constant in length but changes color from black to grey",
+            "It completely vanishes until they reach the next streetlamp"
+          ],
+          "correct": 1,
+          "bloom_level": "apply",
+          "difficulty": "medium",
+          "lo_id": "SCI6-CH10-S03-LO03",
+          "lo_title": "Umbra, Penumbra & Shadow Sizing",
+          "hint": "Trace the angle of rays from the elevated point source past the person's head to the pavement.",
+          "explanation": "As the angle of incident light becomes steeper (closer to vertical overhead), the projected geometric shadow on the ground shortens. Once directly underneath, it is minimal, and then elongates behind them as the angle shallows.",
+          "icon": "arrow-right"
+        },
+        {
+          "id": "q3_2",
+          "text": "Which three elements are strictly necessary and sufficient to produce a cast shadow?",
+          "options": [
+            "A luminous source, an opaque or translucent obstacle, and a projection surface/screen",
+            "A concave mirror, a vacuum chamber, and an observer's eye",
+            "Direct sunlight, atmospheric dust, and an electrical ground",
+            "A prism, a magnifying glass, and a dark room"
+          ],
+          "correct": 0,
+          "bloom_level": "remember",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S03-LO03",
+          "lo_title": "Umbra, Penumbra & Shadow Sizing",
+          "hint": "You need something that emits light, something that blocks light, and somewhere for the blocked region to fall.",
+          "explanation": "Shadow formation fundamentally requires: (1) a source of photons, (2) an obstruction that intercepts those photons, and (3) a physical surface or medium upon which the absence of light can be observed.",
+          "icon": "box"
+        },
+        {
+          "id": "q3_3",
+          "text": "When performing a hand-shadow projection against a wall using a single stationary flashlight, how can the performer make the shadow grow much larger?",
+          "options": [
+            "Move their hand closer to the wall and further from the flashlight",
+            "Move their hand closer to the flashlight and further from the wall",
+            "Switch to a dimmer, colored bulb",
+            "Move the flashlight further away from both hand and wall"
+          ],
+          "correct": 1,
+          "bloom_level": "apply",
+          "difficulty": "medium",
+          "lo_id": "SCI6-CH10-S03-LO03",
+          "lo_title": "Umbra, Penumbra & Shadow Sizing",
+          "hint": "Consider the diverging cone of rays emitted by the flashlight.",
+          "explanation": "Light from a point source diverges outward in a cone. Placing the hand closer to the source intercepts a wider angular sector of rays, projecting an expanded geometric shadow onto the distant wall.",
+          "icon": "maximize"
+        },
+        {
+          "id": "q3_4",
+          "text": "At what time of day will a vertical monument in New Delhi cast its shortest shadow on a clear summer day?",
+          "options": [
+            "Sunrise (approx. 5:45 AM)",
+            "Mid-morning (approx. 9:30 AM)",
+            "Solar noon (when the Sun reaches maximum altitude)",
+            "Late afternoon (approx. 5:00 PM)"
+          ],
+          "correct": 2,
+          "bloom_level": "understand",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S03-LO03",
+          "lo_title": "Umbra, Penumbra & Shadow Sizing",
+          "hint": "Shadow length is inversely related to solar elevation angle.",
+          "explanation": "At solar noon, the Sun reaches its highest zenith elevation in the sky. Incident rays strike the Earth at their steepest angle, producing the shortest cast shadow of the day.",
+          "icon": "clock"
+        },
+        {
+          "id": "q3_5",
+          "text": "In optical ray tracing, what is the canonical scientific term for the completely dark inner core of a shadow where the light source is 100% occluded?",
+          "options": [
+            "The penumbra",
+            "The umbra",
+            "The antumbra",
+            "The diffraction fringe"
+          ],
+          "correct": 1,
+          "bloom_level": "remember",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S03-LO03",
+          "lo_title": "Umbra, Penumbra & Shadow Sizing",
+          "hint": "Derived from Latin for 'shadow'. Starts with 'U'.",
+          "explanation": "The umbra is the central, darkest region of a shadow where all direct light rays from the illuminating source are completely blocked by the opaque object.",
+          "icon": "focus"
+        },
+        {
+          "id": "q3_6",
+          "text": "What is the lighter, soft-focus outer boundary region of a shadow where only a fraction of an extended light source is blocked?",
+          "options": [
+            "The penumbra",
+            "The corona",
+            "The umbra",
+            "The optical axis"
+          ],
+          "correct": 0,
+          "bloom_level": "remember",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S03-LO03",
+          "lo_title": "Umbra, Penumbra & Shadow Sizing",
+          "hint": "Latin prefix 'paene' meaning 'almost' + 'umbra'.",
+          "explanation": "The penumbra is the transitional grey zone surrounding the umbra where the light source is only partially obscured, creating a gradient from dark to full illumination.",
+          "icon": "cloud"
+        },
+        {
+          "id": "q3_7",
+          "text": "Why does a tiny pinhole LED produce razor-sharp shadow edges, whereas an extended fluorescent tube produces wide, blurry shadow borders?",
+          "options": [
+            "Fluorescent light travels in parabolic waves instead of straight lines",
+            "A point source produces only an umbra; an extended source creates multiple overlapping shadow projections, generating a wide penumbra",
+            "LED photons move with higher kinetic energy",
+            "Fluorescent tubes polarize shadows into radio waves"
+          ],
+          "correct": 1,
+          "bloom_level": "analyze",
+          "difficulty": "hard",
+          "lo_id": "SCI6-CH10-S03-LO03",
+          "lo_title": "Umbra, Penumbra & Shadow Sizing",
+          "hint": "Every point on an extended source casts its own shadow from a slightly different angle.",
+          "explanation": "An extended light source is an array of infinite point emitters. Each point casts a slightly offset shadow. Where these shadows overlap only partially, a wide penumbral gradient appears, blurring the border.",
+          "icon": "target"
+        },
+        {
+          "id": "q3_8",
+          "text": "Why does a commercial airliner flying at 35,000 feet under bright midday sunshine fail to cast a visible shadow on the ground?",
+          "options": [
+            "Modern airplanes are coated with transparent anti-radar stealth paint",
+            "Atmospheric nitrogen absorbs shadows before they reach sea level",
+            "The Sun is an extended angular light source (~0.5°); at high altitudes, the airplane's umbra tapers to a point long before reaching the ground, leaving an imperceptibly diluted penumbra",
+            "The aircraft flies faster than the speed of light propagation"
+          ],
+          "correct": 2,
+          "bloom_level": "analyze",
+          "difficulty": "hard",
+          "lo_id": "SCI6-CH10-S03-LO03",
+          "lo_title": "Umbra, Penumbra & Shadow Sizing",
+          "hint": "Because the Sun is vastly larger than the plane, the plane's umbra converges into a cone and terminates in midair.",
+          "explanation": "The Sun subtends an angular diameter of 0.5 degrees. Light rays converge past the airplane, causing its conical umbra to end several thousand feet below the plane. By the time light reaches the ground, the penumbra is so vast and faint that it blends completely into ambient daylight.",
+          "icon": "plane"
+        },
+        {
+          "id": "q3_9",
+          "text": "If an opaque card is held stationary in front of a flashlight, what happens to its cast shadow as the white display screen behind it is moved twice as far away?",
+          "options": [
+            "The shadow shrinks and becomes noticeably darker",
+            "The shadow area expands and its perimeter edges become softer/fuzzier",
+            "The shadow stays identical in size and crispness",
+            "The shadow disappears completely"
+          ],
+          "correct": 1,
+          "bloom_level": "understand",
+          "difficulty": "medium",
+          "lo_id": "SCI6-CH10-S03-LO03",
+          "lo_title": "Umbra, Penumbra & Shadow Sizing",
+          "hint": "Light rays diverge outward from the obstacle toward the screen.",
+          "explanation": "Because rays diverge past the obstacle, moving the projection surface further away gives the blocked ray envelope more distance to expand, increasing the shadow size while enlarging the penumbra.",
+          "icon": "expand"
+        },
+        {
+          "id": "q3_10",
+          "text": "The geometric precision of shadows and sharp silhouettes formed by obstacles provides definitive empirical evidence that light:",
+          "options": [
+            "Travels along rectilinear (straight-line) paths in homogeneous media",
+            "Can easily bend around opaque edges like sound waves do",
+            "Requires gravitational fields to maintain velocity",
+            "Is composed solely of magnetic dipole particles"
+          ],
+          "correct": 0,
+          "bloom_level": "understand",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S03-LO03",
+          "lo_title": "Umbra, Penumbra & Shadow Sizing",
+          "hint": "If light curved easily around macroscopic objects, sharp dark silhouettes could never form.",
+          "explanation": "If light bent freely around obstacles (like macroscopic sound waves do around doorways), it would fill the volume behind any barrier. The existence of sharp, geometrically well-defined shadows proves rectilinear propagation.",
+          "icon": "zap"
+        }
+      ]
+    },
+    {
+      "id": "eclipse",
+      "title": "Eclipses & Astronomical Shadows",
+      "lo_id": "SCI6-CH10-S04-LO04",
+      "lo_title": "Solar & Lunar Shadow Alignment",
+      "icon": "moon",
+      "questions": [
+        {
+          "id": "q4_1",
+          "text": "During a Total Solar Eclipse, which celestial body positions itself directly between the Sun and the Earth to block sunlight?",
+          "options": [
+            "Planet Venus",
+            "The Moon",
+            "A dense interstellar gas cloud",
+            "The planet Mars"
+          ],
+          "correct": 1,
+          "bloom_level": "remember",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S04-LO04",
+          "lo_title": "Solar & Lunar Shadow Alignment",
+          "hint": "It is Earth's only natural satellite.",
+          "explanation": "A solar eclipse happens when the Moon passes directly in line between the Sun and the Earth, casting its shadow onto portions of Earth's surface.",
+          "icon": "moon"
+        },
+        {
+          "id": "q4_2",
+          "text": "An astronomical observer situated directly inside the Moon's ground-level umbra on Earth witnesses which phenomenon?",
+          "options": [
+            "A normal, full midday sun",
+            "A partial solar eclipse (sun seen as a crescent)",
+            "A total solar eclipse with 100% solar disc occlusion and visible solar corona",
+            "A Blood Moon lunar eclipse"
+          ],
+          "correct": 2,
+          "bloom_level": "understand",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S04-LO04",
+          "lo_title": "Solar & Lunar Shadow Alignment",
+          "hint": "The umbra represents the zone of total occlusion.",
+          "explanation": "The umbral shadow corresponds to the path of totality. Within this corridor, the Moon completely obscures the photosphere, allowing the faint solar corona to become visible.",
+          "icon": "eye-off"
+        },
+        {
+          "id": "q4_3",
+          "text": "Why does the Moon take on a distinctive coppery-red 'Blood Moon' coloration during a Total Lunar Eclipse rather than becoming pitch black?",
+          "options": [
+            "The lunar surface rocks heat up to incandescence and glow red",
+            "Sunlight passing through Earth's atmospheric ring is refracted and Rayleigh-scattered, filtering out blue wavelengths and bending red light into Earth's shadow",
+            "Solar wind excites neon and helium in the thin lunar exosphere",
+            "The Earth's oceans reflect red algae blooms into space"
+          ],
+          "correct": 1,
+          "bloom_level": "analyze",
+          "difficulty": "hard",
+          "lo_id": "SCI6-CH10-S04-LO04",
+          "lo_title": "Solar & Lunar Shadow Alignment",
+          "hint": "Earth's atmosphere acts as a spherical lens projecting all of Earth's simultaneous sunrises and sunsets into its shadow cone.",
+          "explanation": "Earth's atmosphere scatters shorter blue wavelengths and bends the remaining long-wavelength red light into the umbral shadow cone. This refracted red light illuminates the eclipsed Moon with a coppery glow.",
+          "icon": "flame"
+        },
+        {
+          "id": "q4_4",
+          "text": "Why do solar and lunar eclipses NOT occur every single calendar month during New and Full Moon phases?",
+          "options": [
+            "The Moon orbits Earth at variable speeds that outpace shadows",
+            "The Moon's orbital plane is tilted at approximately 5 degrees relative to Earth's ecliptic plane, so its shadow usually passes above or below",
+            "The Sun shifts position north and south every two weeks",
+            "Earth's magnetic field repels the Moon's shadow cone"
+          ],
+          "correct": 1,
+          "bloom_level": "understand",
+          "difficulty": "medium",
+          "lo_id": "SCI6-CH10-S04-LO04",
+          "lo_title": "Solar & Lunar Shadow Alignment",
+          "hint": "Orbits in 3D space are rarely on the exact same planar line.",
+          "explanation": "The Moon's orbit is inclined by about 5.14° relative to the Earth's orbit around the Sun (ecliptic). Syzygy alignment occurs only when the New or Full Moon happens near the orbital nodes.",
+          "icon": "globe"
+        },
+        {
+          "id": "q4_5",
+          "text": "In which lunar phase must the Moon strictly reside for a Solar Eclipse to take place?",
+          "options": [
+            "Full Moon",
+            "First Quarter",
+            "New Moon",
+            "Waxing Gibbous"
+          ],
+          "correct": 2,
+          "bloom_level": "remember",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S04-LO04",
+          "lo_title": "Solar & Lunar Shadow Alignment",
+          "hint": "The Moon must be on the daytime side of Earth, positioned between Earth and Sun.",
+          "explanation": "A solar eclipse requires the Moon to stand directly between the Earth and Sun. This astronomical configuration corresponds strictly to the New Moon phase.",
+          "icon": "circle-dot"
+        },
+        {
+          "id": "q4_6",
+          "text": "In which lunar phase must the Moon strictly reside for a Lunar Eclipse to occur?",
+          "options": [
+            "Full Moon",
+            "New Moon",
+            "Third Quarter",
+            "Waning Crescent"
+          ],
+          "correct": 0,
+          "bloom_level": "remember",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S04-LO04",
+          "lo_title": "Solar & Lunar Shadow Alignment",
+          "hint": "Earth must be between the Sun and Moon, illuminating the near side while casting its shadow.",
+          "explanation": "A lunar eclipse occurs when Earth passes directly between the Sun and Moon, casting Earth's shadow onto the Moon. This configuration can only occur during a Full Moon.",
+          "icon": "circle"
+        },
+        {
+          "id": "q4_7",
+          "text": "Why can a Total Lunar Eclipse be viewed by billions of people across an entire hemisphere, while a Total Solar Eclipse can only be seen along a narrow strip of land?",
+          "options": [
+            "Solar eclipses only happen at the North Pole",
+            "In a lunar eclipse, Earth's massive shadow covers the entire Moon; in a solar eclipse, the Moon's tiny umbra projects a narrow shadow track (~100-250 km wide) on Earth",
+            "Lunar eclipses emit brighter radiation that penetrates clouds worldwide",
+            "Earth rotates backwards during solar eclipses"
+          ],
+          "correct": 1,
+          "bloom_level": "analyze",
+          "difficulty": "hard",
+          "lo_id": "SCI6-CH10-S04-LO04",
+          "lo_title": "Solar & Lunar Shadow Alignment",
+          "hint": "Compare the physical size of Earth's shadow at lunar distance versus the Moon's shadow on Earth's surface.",
+          "explanation": "Earth is ~3.7 times wider than the Moon. Earth's shadow easily encompasses the entire lunar surface, making a lunar eclipse visible to anyone facing the Moon. Conversely, the Moon's umbra tapers to a small spot (100–250 km wide) on Earth's vast surface.",
+          "icon": "target"
+        },
+        {
+          "id": "q4_8",
+          "text": "If the Moon's average orbital distance were 10% further from Earth than it is today, what impact would this have on Solar Eclipses?",
+          "options": [
+            "Total solar eclipses would last for 24 hours continuously",
+            "Total solar eclipses would become completely impossible; only annular (ring of fire) and partial solar eclipses could occur",
+            "Solar eclipses would happen twice every month",
+            "The Sun's corona would permanently vanish"
+          ],
+          "correct": 1,
+          "bloom_level": "apply",
+          "difficulty": "hard",
+          "lo_id": "SCI6-CH10-S04-LO04",
+          "lo_title": "Solar & Lunar Shadow Alignment",
+          "hint": "Increased distance reduces apparent angular diameter in the sky.",
+          "explanation": "Currently, the Moon's apparent angular size matches the Sun's (~0.5°). If the Moon were 10% further, its apparent diameter would always be smaller than the Sun's, so its umbral cone would never reach Earth's surface — yielding only annular eclipses.",
+          "icon": "expand"
+        },
+        {
+          "id": "q4_9",
+          "text": "What is the name of the superheated, ghostly white outer atmosphere of the Sun that becomes visible to observers during a Total Solar Eclipse?",
+          "options": [
+            "The troposphere",
+            "The solar corona",
+            "The photosphere",
+            "The radiative zone"
+          ],
+          "correct": 1,
+          "bloom_level": "remember",
+          "difficulty": "easy",
+          "lo_id": "SCI6-CH10-S04-LO04",
+          "lo_title": "Solar & Lunar Shadow Alignment",
+          "hint": "Latin for 'crown'.",
+          "explanation": "The corona is the outermost plasma layer of the solar atmosphere. Usually outshone by the brilliant photosphere, it radiates as a pearly-white halo during totality.",
+          "icon": "sun"
+        },
+        {
+          "id": "q4_10",
+          "text": "What astronomical conditions produce an 'annular' solar eclipse (commonly known as the 'Ring of Fire')?",
+          "options": [
+            "The Moon is near apogee (furthest from Earth) in its elliptical orbit, making its apparent disc too small to completely cover the solar photosphere",
+            "The Sun passes behind a ring of cometary debris in the Kuiper belt",
+            "The Earth's atmosphere is unusually clear of clouds and ozone",
+            "The Moon spins 90 degrees on its rotational axis"
+          ],
+          "correct": 0,
+          "bloom_level": "understand",
+          "difficulty": "medium",
+          "lo_id": "SCI6-CH10-S04-LO04",
+          "lo_title": "Solar & Lunar Shadow Alignment",
+          "hint": "When the Moon is at apogee (most distant), its angular size shrinks below the Sun's angular size.",
+          "explanation": "Because the Moon's orbit is elliptical, its distance varies. At apogee, its apparent size is slightly smaller than the Sun's disc. When perfectly centered, a brilliant ring ('annulus') of the photosphere remains visible around the dark lunar silhouette.",
+          "icon": "circle-dot"
+        }
+      ]
+    }
+  ]
+}

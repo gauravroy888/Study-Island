@@ -1,24 +1,25 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '../supabase';
 import Card from './Card';
 import { PlusCircle, Trash2, Save, X, Database } from 'lucide-react';
 
-const classesList = ['Class 1st', 'Class 2nd', 'Class 3rd', 'Class 4th', 'Class 5th', 'Class 6th', 'Class 7th', 'Class 8th', 'Class 9th', 'Class 10th', 'Class 11th', 'Class 12th'];
+const classesList = ['Class 6th'];
+const generateRandomId = () => Date.now() + Math.random();
 
 export default function CreateQATest({ onCancel }) {
-  const [testInfo, setTestInfo] = useState({ title: '', assignedClass: 'Class 1st', duration: '' });
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [testInfo, setTestInfo] = useState({ title: '', assignedClass: 'Class 6th', duration: '' });
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('10:00');
-  const [endDate, setEndDate] = useState(new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(() => new Date(Date.now() + 86400000).toISOString().split('T')[0]);
   const [endTime, setEndTime] = useState('18:00');
-  
+
   const [questions, setQuestions] = useState([
     { id: 1, text: '', points: 5 }
   ]);
 
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
   const [bankQuestions, setBankQuestions] = useState([]);
-  
+
   const fetchBankQuestions = async () => {
     const currentUser = JSON.parse(localStorage.getItem('edtech_user') || '{}');
     const { data, error } = await supabase
@@ -26,23 +27,23 @@ export default function CreateQATest({ onCancel }) {
       .select('*')
       .eq('type', 'qa')
       .eq('created_by', currentUser.email || '');
-      
+
     if (!error && data) {
       setBankQuestions(data);
     }
   };
-  
+
   const openBankModal = () => {
     setIsBankModalOpen(true);
     fetchBankQuestions();
   };
-  
+
   const importQuestion = (bankQ) => {
-    setQuestions([
-      ...questions,
-      { 
-        id: Date.now() + Math.random(), 
-        text: bankQ.text, 
+    setQuestions(prev => [
+      ...prev,
+      {
+        id: generateRandomId(),
+        text: bankQ.text,
         points: bankQ.points || 5
       }
     ]);
@@ -80,7 +81,7 @@ export default function CreateQATest({ onCancel }) {
     try {
       const startDateTime = new Date(`${startDate}T${startTime}`);
       const endDateTime = new Date(`${endDate}T${endTime}`);
-      
+
       const currentUser = JSON.parse(localStorage.getItem('edtech_user') || '{}');
       const { error } = await supabase.from('tests').insert({
         title: testInfo.title,
@@ -119,8 +120,8 @@ export default function CreateQATest({ onCancel }) {
   };
 
   const inputStyle = {
-    width: '100%', padding: '10px', borderRadius: '8px', 
-    background: 'rgba(255,255,255,0.05)', border: '1px solid var(--panel-border)', 
+    width: '100%', padding: '10px', borderRadius: '8px',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid var(--panel-border)',
     color: 'white', marginBottom: '15px', colorScheme: 'dark'
   };
 
@@ -130,7 +131,7 @@ export default function CreateQATest({ onCancel }) {
         <h2>Create Q/A Test</h2>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-ghost" onClick={onCancel}><X size={16} /> Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave}><Save size={16} /> Save Test</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}><Save size={16} /> {isSaving ? 'Saving...' : 'Save Test'}</button>
         </div>
       </div>
 
@@ -138,7 +139,7 @@ export default function CreateQATest({ onCancel }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
           <div>
             <label style={{ display: 'block', fontSize: '14px', marginBottom: '5px', color: 'var(--text-secondary)' }}>Test Title</label>
-            <input type="text" style={inputStyle} placeholder="e.g., Physics Essay Exam" 
+            <input type="text" style={inputStyle} placeholder="e.g., Physics Essay Exam"
                    value={testInfo.title} onChange={e => setTestInfo({...testInfo, title: e.target.value})} />
           </div>
           <div>
@@ -151,11 +152,11 @@ export default function CreateQATest({ onCancel }) {
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '14px', marginBottom: '5px', color: 'var(--text-secondary)' }}>Duration (Mins)</label>
-            <input type="number" style={inputStyle} placeholder="e.g., 60" 
+            <input type="number" style={inputStyle} placeholder="e.g., 60"
                    value={testInfo.duration} onChange={e => setTestInfo({...testInfo, duration: e.target.value})} />
           </div>
         </div>
-        
+
         <h4 style={{ margin: '15px 0 10px', color: 'var(--text-primary)' }}>Availability Window</h4>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -188,7 +189,7 @@ export default function CreateQATest({ onCancel }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Points:</span>
-                <input type="number" style={{ ...inputStyle, width: '60px', marginBottom: 0, padding: '5px' }} 
+                <input type="number" style={{ ...inputStyle, width: '60px', marginBottom: 0, padding: '5px' }}
                        value={q.points} onChange={e => updateQuestionFields(q.id, 'points', e.target.value)} />
               </div>
               <button className="btn btn-ghost" style={{ padding: '5px' }} onClick={() => removeQuestion(q.id)}>
@@ -196,8 +197,8 @@ export default function CreateQATest({ onCancel }) {
               </button>
             </div>
           </div>
-          
-          <textarea style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' }} placeholder="Enter your detailed question here..." 
+
+          <textarea style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' }} placeholder="Enter your detailed question here..."
                  value={q.text} onChange={e => updateQuestionFields(q.id, 'text', e.target.value)} />
         </Card>
       ))}

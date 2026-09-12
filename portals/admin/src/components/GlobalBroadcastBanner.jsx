@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Megaphone, X } from 'lucide-react';
 import { supabase } from '../supabase';
 
@@ -7,15 +7,17 @@ export default function GlobalBroadcastBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     // Resolve the current logged-in user so we can suppress the banner for the author
     let currentUserEmail = null;
     try {
       const stored = localStorage.getItem('edtech_user');
       if (stored) currentUserEmail = JSON.parse(stored)?.email || null;
-    } catch (e) {}
+    } catch { /* ignore */ }
 
     // Helper: show a broadcast only if the user hasn't dismissed it AND is not the author
     const tryShowBroadcast = (id, title, message, author) => {
+      if (!isMounted) return;
       const dismissedId = localStorage.getItem('edtech_dismissed_broadcast');
       if (dismissedId === id) return; // already dismissed
 
@@ -46,7 +48,7 @@ export default function GlobalBroadcastBanner() {
           );
         }
       }
-    } catch (e) {}
+    } catch { /* ignore */ }
 
     // 2. Fetch latest announcement from Supabase
     const fetchLatestAnnouncement = async () => {
@@ -73,7 +75,7 @@ export default function GlobalBroadcastBanner() {
       }
     };
 
-    fetchLatestAnnouncement();
+    void fetchLatestAnnouncement();
 
     // 3. Listen on native BroadcastChannel for instant cross-tab notification
     let bc = null;
@@ -91,7 +93,7 @@ export default function GlobalBroadcastBanner() {
             );
           }
         };
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
 
     // 4. Supabase Realtime — new announcements and global notifications
@@ -135,11 +137,12 @@ export default function GlobalBroadcastBanner() {
             );
           }
         }
-      } catch (e) {}
+      } catch { /* ignore */ }
     };
     window.addEventListener('storage', handleStorageChange);
 
     return () => {
+      isMounted = false;
       if (bc) bc.close();
       supabase.removeChannel(subscription);
       window.removeEventListener('storage', handleStorageChange);

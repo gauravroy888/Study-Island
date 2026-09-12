@@ -1,15 +1,16 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import Dashboard from './views/Dashboard';
-import Courses from './views/Courses';
-import Timetable from './views/Timetable';
-import LiveClass from './views/LiveClass';
-import Chats from './views/Chats';
-import Mentors from './views/Mentors';
-import Progress from './views/Progress';
-import Notifications from './views/Notifications';
-import Settings from './views/Settings';
+
+const Dashboard = lazy(() => import('./views/Dashboard'));
+const Courses = lazy(() => import('./views/Courses'));
+const Timetable = lazy(() => import('./views/Timetable'));
+const LiveClass = lazy(() => import('./views/LiveClass'));
+const Chats = lazy(() => import('./views/Chats'));
+const Mentors = lazy(() => import('./views/Mentors'));
+const Progress = lazy(() => import('./views/Progress'));
+const Notifications = lazy(() => import('./views/Notifications'));
+const Settings = lazy(() => import('./views/Settings'));
 import { ThemeProvider } from './ThemeContext';
 import { supabase } from './supabase';
 import { PresenceProvider } from './hooks/usePresence';
@@ -87,31 +88,9 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
-  const [user, setUser] = React.useState(() => {
-    const studentStr = localStorage.getItem('edtech_student_user');
-    if (studentStr) {
-      try { return JSON.parse(studentStr); } catch (e) {}
-    }
-    const userStr = localStorage.getItem('edtech_user');
-    if (userStr) {
-      try {
-        const u = JSON.parse(userStr);
-        if (u && (u.role === 'student' || !u.role)) return u;
-      } catch (e) {}
-    }
-    return {
-      uid: 'student-arav-001',
-      email: 'arav.sharma@dps.edu.in',
-      name: 'Arav Sharma',
-      role: 'student',
-      avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=AravSharma&backgroundColor=b6e3f4'
-    };
-  });
+  const [user, setUser] = React.useState(null);
 
-  // Share Gemini key with other platform pages (Study Island, etc.) via localStorage
   React.useEffect(() => {
-    const k = localStorage.getItem('aria_gemini_key') || (typeof window !== 'undefined' ? window.ARIA_GEMINI_KEY : '');
-    if (k && !localStorage.getItem('aria_gemini_key')) localStorage.setItem('aria_gemini_key', k);
     loadSupabaseSession();
   }, []);
 
@@ -120,16 +99,9 @@ export default function App() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session || !session.user) {
-          const uStr = localStorage.getItem('edtech_student_user') || localStorage.getItem('edtech_user');
-          if (uStr) {
-            try {
-              const u = JSON.parse(uStr);
-              if (u) {
-                setUser(u);
-                return;
-              }
-            } catch (e) {}
-          }
+          setUser(null);
+          localStorage.removeItem('edtech_student_user');
+          localStorage.removeItem('edtech_user');
           return;
         }
 
@@ -142,7 +114,7 @@ export default function App() {
         try {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('*')
+            .select('id, auth_id, email, name, role, avatar_url, department, age, timetable, is_archived')
             .eq('email', userEmail)
             .maybeSingle();
 
@@ -151,7 +123,7 @@ export default function App() {
             if (profile.name) verifiedName = profile.name;
             if (profile.avatar_url) verifiedAvatar = profile.avatar_url;
           }
-        } catch (e) {}
+        } catch { /* ignore profile load error */ }
 
         if (userEmail === 'urvashinath0409@gmail.com') {
           verifiedRole = 'super_admin';
@@ -170,6 +142,7 @@ export default function App() {
         setUser(verifiedUser);
       } catch (err) {
         console.error('Student session verification error:', err);
+        setUser(null);
       }
     };
 
@@ -177,10 +150,9 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
-        const uStr = localStorage.getItem('edtech_student_user') || localStorage.getItem('edtech_user');
-        if (uStr) {
-          try { setUser(JSON.parse(uStr)); } catch (e) {}
-        }
+        setUser(null);
+        localStorage.removeItem('edtech_student_user');
+        localStorage.removeItem('edtech_user');
       } else {
         verifySession();
       }
@@ -199,18 +171,6 @@ export default function App() {
     : '';
   const loginUrl = window.location.origin + repoPrefix + '/login.html';
 
-  const handleQuickStudentLogin = () => {
-    const studentUser = {
-      uid: 'std-arav-001',
-      email: 'arav.sharma@dps.edu.in',
-      name: 'Arav Sharma',
-      role: 'student',
-      org: 'Delhi Public School',
-      avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=AravSharma&backgroundColor=b6e3f4'
-    };
-    localStorage.setItem('edtech_user', JSON.stringify(studentUser));
-    setUser(studentUser);
-  };
 
   const role = user?.role?.toLowerCase();
   const isAuthorized = user && (
@@ -250,38 +210,26 @@ export default function App() {
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button
-              onClick={handleQuickStudentLogin}
+            <a
+              href={loginUrl}
               style={{
+                display: 'block',
                 width: '100%',
+                boxSizing: 'border-box',
                 padding: '14px 28px',
                 background: 'linear-gradient(135deg, var(--brand-primary, #00F0FF), var(--brand-secondary, #3B82F6))',
                 color: '#000',
-                border: 'none',
+                textDecoration: 'none',
                 borderRadius: '12px',
                 fontWeight: '800',
                 fontSize: '1rem',
                 cursor: 'pointer',
+                textAlign: 'center',
                 boxShadow: '0 0 25px var(--brand-glow, rgba(0, 240, 255, 0.4))',
                 transition: 'all 0.2s ease'
               }}
             >
-              ⚡ Launch Student Session (Arav Sharma)
-            </button>
-
-            <a href={loginUrl} style={{
-              display: 'inline-block',
-              padding: '12px 28px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#cbd5e1',
-              textDecoration: 'none',
-              borderRadius: '12px',
-              fontWeight: '600',
-              fontSize: '0.9rem',
-              transition: 'all 0.2s ease'
-            }}>
-              Return to Universal Login
+              ⚡ Return to Universal Login
             </a>
           </div>
         </div>
@@ -295,19 +243,25 @@ export default function App() {
         <PresenceProvider user={user}>
           <BrowserRouter basename={import.meta.env.DEV ? '/' : '/student'}>
             <Layout>
-              <Routes>
-                <Route path="/" element={<Navigate to="/courses" replace />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/courses" element={<Courses />} />
-                <Route path="/timetable" element={<Timetable />} />
-                <Route path="/liveclass" element={<LiveClass />} />
-                <Route path="/chats" element={<Chats />} />
-                <Route path="/mentors" element={<Mentors />} />
-                <Route path="/progress" element={<Progress />} />
-                <Route path="/notifications" element={<Notifications />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="*" element={<Navigate to="/courses" replace />} />
-              </Routes>
+              <Suspense fallback={
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: 'var(--brand-primary, #00F0FF)', fontFamily: 'Inter, system-ui, sans-serif', fontSize: '1.1rem', fontWeight: 600 }}>
+                  <span style={{ display: 'inline-block', marginRight: '10px' }}>⚡</span> Loading workspace...
+                </div>
+              }>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/courses" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/courses" element={<Courses />} />
+                  <Route path="/timetable" element={<Timetable />} />
+                  <Route path="/liveclass" element={<LiveClass />} />
+                  <Route path="/chats" element={<Chats />} />
+                  <Route path="/mentors" element={<Mentors />} />
+                  <Route path="/progress" element={<Progress />} />
+                  <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="*" element={<Navigate to="/courses" replace />} />
+                </Routes>
+              </Suspense>
             </Layout>
           </BrowserRouter>
         </PresenceProvider>

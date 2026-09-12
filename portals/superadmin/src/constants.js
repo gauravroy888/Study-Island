@@ -7,16 +7,7 @@ export const SUPABASE_CONFIG = {
   key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFteXJ4dnRiemxibnZ6eHlwbnVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA4OTcsImV4cCI6MjA5NTM5Njg5N30.ABvW_oBzXC2Ffxm5ToLh6t4WmdKPdtg9SyfeAE76iJo',
 };
 
-export const INITIAL_USERS = [
-  { id: "usr-super", name: "Urvashi Nath", email: "urvashinath0409@gmail.com", role: "SUPER_ADMIN", status: "Active", institution_id: null, org: "—", joined: "2026-08-01" },
-  { id: "usr-immersion", name: "Immersion Labs", email: "immersionlabsindia@gmail.com", role: "ADMIN", status: "Active", institution_id: "inst-dps-001", org: "Delhi Public School", joined: "2026-05-20" },
-  { id: "c2d7ceb4-e62b-49d2-a1fe-2057dc35b61a", name: "Harsh", email: "aimodelnewplay@gmail.com", role: "ADMIN", status: "Active", institution_id: "inst-dps-001", org: "Delhi Public School", joined: "2026-05-27" },
-  { id: "d8e2b42f-63b7-47fa-be5d-4d0ac31ce00f", name: "Harsh", email: "rathorehps@gmail.com", role: "TEACHER", status: "Active", institution_id: "inst-dps-001", org: "Delhi Public School", joined: "2026-05-27" },
-  { id: "03befb93-e2c8-4c67-bf4b-f03a78e93850", name: "Gaurav", email: "gauravroy476@gmail.com", role: "TEACHER", status: "Active", institution_id: "inst-dps-001", org: "Delhi Public School", joined: "2026-07-03" },
-  { id: "a44b5ea7-3f4a-4d05-aa3f-9c21e25406a5", name: "Harsh", email: "hps.sunghrathore@gmail.com", role: "STUDENT", status: "Active", institution_id: "inst-dps-001", org: "Delhi Public School", joined: "2026-05-27" },
-  { id: "usr-thorroy", name: "GAURAV Roy", email: "thorroy888@gmail.com", role: "STUDENT", status: "Active", institution_id: "inst-dps-001", org: "Delhi Public School", joined: "2026-05-27" },
-  { id: "usr-saurav", name: "Saurav Roy", email: "sauravroy469@gmail.com", role: "STUDENT", status: "Active", institution_id: "inst-dps-001", org: "Delhi Public School", joined: "2026-06-15" },
-];
+export const INITIAL_USERS = [];
 
 export const DPS_INSTITUTION = {
   id: "inst-dps-001",

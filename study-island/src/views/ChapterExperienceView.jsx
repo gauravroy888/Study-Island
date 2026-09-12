@@ -1,7 +1,6 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import * as Icons from 'lucide-react';
-import AITutorWidget from '../components/AITutorWidget';
     /** @jsxRuntime classic */
 
     const playClickSound = () => {
@@ -1523,4 +1522,4 @@ import AITutorWidget from '../components/AITutorWidget';
       return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
 
-export default function ChapterExperienceView() { return (<div className='relative min-h-screen bg-slate-950 text-white'><App /><AITutorWidget /></div>); }
+export default function ChapterExperienceView() { return (<div className='relative min-h-screen bg-slate-950 text-white'><App /></div>); }

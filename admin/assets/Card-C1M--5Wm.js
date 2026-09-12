@@ -1,0 +1,1 @@
+import{t as e}from"./vendor-react-BE4g7uK2.js";var t=e();function n({children:e,style:n={}}){return(0,t.jsx)(`div`,{className:`custom-card`,style:n,children:e})}export{n as t};

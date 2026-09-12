@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Eraser, Highlighter, Maximize, Minimize, MousePointer2, Pencil, Redo2, Trash2, Undo2, Video } from "lucide-react";
-import AITutorWidget from "../components/AITutorWidget";
 import { useTheme } from "../ThemeContext";
 import futureBackground from "../../assets/Future verion lowres.jpg";
 import { supabase } from "../supabase";
@@ -381,7 +380,7 @@ function SubjectsScreen({ go }) {
       try {
         const { data, error } = await supabase
           .from("course_chapters")
-          .select("id, title, chapter_slug, subject_name, front_visuals_url, scene_3d_model_url, experience_url, experiments_url, quiz_url, mixed_reality_url, stories_url");
+          .select("id, title, chapter_slug, subject_id, front_visuals_url, scene_3d_model_url, experience_url, experiments_url, quiz_url, mixed_reality_url, stories_url, subjects(id, name)");
         if (data && !error) {
           setDbChapters(data);
         }
@@ -398,7 +397,7 @@ function SubjectsScreen({ go }) {
 
     // Check if any row in course_chapters matches this subject and has content
     const matching = dbChapters.filter(c => {
-      const sName = (c.subject_name || "").toLowerCase();
+      const sName = (c.subjects?.name || "").toLowerCase();
       return sName.includes(id) || (id === "pe" && sName.includes("physical"));
     });
 
@@ -657,6 +656,5 @@ export default function StudyIslandView() {
     {screen === "profile" && <ProfileScreen go={go} />}
     <SmartboardOverlay />
     <BottomNav screen={screen} onNavigate={go} onExit={exit} />
-    <AITutorWidget />
   </div>;
 }

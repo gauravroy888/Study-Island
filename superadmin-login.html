@@ -216,7 +216,7 @@
             <form id="superadminDevForm">
                 <div class="form-group" style="margin-bottom: 16px;">
                     <label>Root SuperAdmin Email / Access Key</label>
-                    <input type="text" id="superadmin-id" class="form-control" placeholder="urvashinath0409@gmail.com" value="urvashinath0409@gmail.com" required>
+                    <input type="text" id="superadmin-id" class="form-control" placeholder="superadmin@platform.edu" value="" required>
                 </div>
                 
                 <div class="form-group" style="margin-bottom: 20px;">
@@ -294,12 +294,37 @@
                         return;
                     }
 
-                    // Fetch profile details
-                    const { data: profile } = await window.supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('auth_id', authData.user.id)
-                        .single();
+                    // Fetch profile details and verify role from database (safe fields only)
+                    let profile = null;
+                    try {
+                        const { data } = await window.supabase
+                            .from('profiles')
+                            .select('id, auth_id, email, name, role, avatar_url, department, age, timetable, is_archived')
+                            .eq('auth_id', authData.user.id)
+                            .maybeSingle();
+                        profile = data;
+                    } catch (_) {}
+
+                    if (!profile) {
+                        try {
+                            const { data } = await window.supabase
+                                .from('profiles')
+                                .select('id, auth_id, email, name, role, avatar_url, department, age, timetable, is_archived')
+                                .eq('email', authData.user.email?.toLowerCase())
+                                .maybeSingle();
+                            profile = data;
+                        } catch (_) {}
+                    }
+
+                    const profileRole = profile?.role?.toLowerCase();
+                    const isSuperAdmin = profileRole === 'super_admin' || profileRole === 'superadmin';
+
+                    if (!isSuperAdmin) {
+                        alert("Access Denied: Account does not have SuperAdministrator privileges.");
+                        btn.innerHTML = origText;
+                        btn.disabled = false;
+                        return;
+                    }
 
                     const profileName = profile?.name || 'SuperAdministrator';
                     const profileAvatar = profile?.avatar_url || null;
@@ -308,7 +333,7 @@
                         uid: authData.user.id,
                         email: authData.user.email,
                         name: profileName,
-                        role: 'super_admin',
+                        role: profileRole,
                         avatar_url: profileAvatar
                     };
 

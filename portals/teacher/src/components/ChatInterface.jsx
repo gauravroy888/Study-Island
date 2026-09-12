@@ -1,42 +1,36 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Search, Send, ArrowLeft, MoreVertical, Users, Check, CheckCheck, 
-  Paperclip, Loader2, X, Maximize2, Pin, Reply, Trash2, Search as SearchIcon, Smile,
-  Copy, Forward
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import {
+  Search, Send, ArrowLeft, Users, Check, CheckCheck,
+  Paperclip, Loader2, X, Maximize2, Smile
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { compressToJpeg } from '../lib/compressImage';
 import { uploadImageToR2 } from '../lib/r2';
 import EmojiPicker from './EmojiPicker';
-import { 
-  LinkPreviewCard, ImageLightbox, WhatsAppMessageActionToolbar, WhatsAppReactionBadge, 
+import {
+  LinkPreviewCard, ImageLightbox, WhatsAppMessageActionToolbar, WhatsAppReactionBadge,
   QuotedMessageBubble, PinnedMessageBanner, TypingIndicatorBanner, ForwardedMessageTag,
-  ForwardMessageModal, extractFirstUrl, formatMessageWithLinks, formatTimeAgo 
+  ForwardMessageModal, extractFirstUrl, formatMessageWithLinks, formatTimeAgo
 } from './MediaChatComponents';
 import { usePresence } from '../hooks/usePresence';
 import './ChatInterface.css';
 
 export default function ChatInterface({ currentUser: propUser, activeTab, selectedClass, isManager, onUnreadCountChange }) {
-  const [currentUser, setCurrentUser] = useState(() => {
+  const currentUser = useMemo(() => {
     if (propUser) return propUser;
     try {
       const stored = localStorage.getItem('edtech_user');
       return stored ? JSON.parse(stored) : { email: 'teacher@edtech.org', name: 'Teacher', role: 'teacher' };
-    } catch (e) {
+    } catch {
       return { email: 'teacher@edtech.org', name: 'Teacher', role: 'teacher' };
     }
-  });
-
-  useEffect(() => {
-    if (propUser) setCurrentUser(propUser);
   }, [propUser]);
 
   const [profiles, setProfiles] = useState([]);
-  const [filteredProfiles, setFilteredProfiles] = useState([]);
   const [groups, setGroups] = useState([]);
   const [conversationsMap, setConversationsMap] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   const [activeContact, setActiveContact] = useState(null); // { isGroup, id, name, email, participants }
   const [currentConversation, setCurrentConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -82,7 +76,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
   };
 
   // 2. Fetch Profiles, Groups & Conversation Activity
-  const fetchProfilesAndConversations = async () => {
+  const fetchProfilesAndConversations = useCallback(async () => {
     if (!currentUser) return;
     try {
       const { data: profData } = await supabase.from('profiles').select('id,name,email,role,avatar_url').order('name');
@@ -147,42 +141,51 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
     } catch(err) {
       console.error('Error fetching profiles & conversations:', err);
     }
-  };
-
-  useEffect(() => {
-    fetchProfilesAndConversations();
-    
-    const profilesSub = supabase.channel('public:profiles_sync_teacher')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchProfilesAndConversations)
-      .subscribe();
-      
-    const groupsSub = supabase.channel('public:conversations:groups_sync_teacher')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, fetchProfilesAndConversations)
-      .subscribe();
-      
-    return () => { 
-      supabase.removeChannel(profilesSub); 
-      supabase.removeChannel(groupsSub);
-    };
   }, [currentUser]);
 
+  useEffect(() => {
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await fetchProfilesAndConversations();
+    };
+    void init();
+
+    const profilesSub = supabase.channel('public:profiles_sync_teacher')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        if (isMounted) fetchProfilesAndConversations();
+      })
+      .subscribe();
+
+    const groupsSub = supabase.channel('public:conversations:groups_sync_teacher')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
+        if (isMounted) fetchProfilesAndConversations();
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(profilesSub);
+      supabase.removeChannel(groupsSub);
+    };
+  }, [fetchProfilesAndConversations]);
+
   // 3. Fetch Unread Counts
-  const fetchUnreadCounts = async () => {
+  const fetchUnreadCounts = useCallback(async () => {
     if (!currentUser) return;
-    
+
     const { data: myConvs } = await supabase.from('conversations')
       .select('id')
       .or(`participant1_email.eq.${currentUser.email},participant2_email.eq.${currentUser.email},participants.cs.["${currentUser.email}"]`);
-      
+
     if (!myConvs || myConvs.length === 0) return;
     const convIds = myConvs.map(c => c.id);
-    
+
     const { data: unreadMsgs } = await supabase.from('messages')
       .select('senderEmail, conversationId')
       .in('conversationId', convIds)
       .eq('is_read', false)
       .neq('senderEmail', currentUser.email);
-      
+
     if (unreadMsgs) {
       const counts = {};
       unreadMsgs.forEach(msg => {
@@ -192,28 +195,35 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
       });
       setUnreadCounts(counts);
     }
-  };
+  }, [currentUser, groups]);
 
   useEffect(() => {
-    fetchUnreadCounts();
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await fetchUnreadCounts();
+    };
+    void init();
     const unreadSub = supabase.channel('public:messages:unread_sync_teacher')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        if (payload.new.senderEmail !== currentUser?.email) {
+        if (payload.new.senderEmail !== currentUser?.email && isMounted) {
           fetchUnreadCounts();
           fetchProfilesAndConversations();
         }
       })
       .subscribe();
-    return () => { supabase.removeChannel(unreadSub); };
-  }, [currentUser, groups]);
-  
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(unreadSub);
+    };
+  }, [currentUser?.email, fetchProfilesAndConversations, fetchUnreadCounts]);
+
   useEffect(() => {
     if (onUnreadCountChange && profiles.length > 0) {
       let studentsCount = 0;
       let staffCount = 0;
       let teachersCount = 0;
       let groupsCount = 0;
-      
+
       profiles.forEach(p => {
         const count = unreadCounts[p.email] || 0;
         if (count > 0) {
@@ -222,31 +232,31 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
           if (p.role === 'teacher') teachersCount += count;
         }
       });
-      
+
       groups.forEach(g => {
         groupsCount += (unreadCounts[g.id] || 0);
       });
-      
+
       const total = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
-      
+
       onUnreadCountChange({
         total,
         students: studentsCount,
         staff: staffCount,
         teachers: teachersCount,
         groups: groupsCount,
-        direct: total, 
-        chat: total 
+        direct: total,
+        chat: total
       });
     }
   }, [unreadCounts, profiles, groups, onUnreadCountChange]);
 
   // 4. Filter & Sort Contacts
-  useEffect(() => {
-    if (!profiles || !currentUser) return;
-    
-    let filtered = [];
-    
+  const filteredProfiles = useMemo(() => {
+    if (!profiles || !currentUser) return [];
+
+    let filtered;
+
     if (activeTab === 'group' || activeTab === 'groups') {
       filtered = groups.map(g => ({ ...g, isGroup: true }));
     } else {
@@ -263,7 +273,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
         filtered = [...classGroups, ...classStudents];
       }
     }
-    
+
     if (searchQuery) {
       filtered = filtered.filter(p => (p.name && p.name.toLowerCase().includes(searchQuery.toLowerCase())) || (p.email && p.email.toLowerCase().includes(searchQuery.toLowerCase())));
     }
@@ -278,32 +288,40 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
       const timeB = convB?.updatedAt ? new Date(convB.updatedAt).getTime() : 0;
       return timeB - timeA;
     });
-    
-    setFilteredProfiles(filtered);
 
-    if (filtered.length > 0) {
+    return filtered;
+  }, [profiles, groups, conversationsMap, activeTab, searchQuery, currentUser, selectedClass]);
+
+  useEffect(() => {
+    if (filteredProfiles.length > 0) {
       const params = new URLSearchParams(window.location.search);
       const targetEmail = params.get('email');
       const targetName = params.get('name');
 
       let target = null;
       if (targetEmail) {
-        target = filtered.find(p => p.email?.toLowerCase() === targetEmail.toLowerCase());
+        target = filteredProfiles.find(p => p.email?.toLowerCase() === targetEmail.toLowerCase());
       }
       if (!target && targetName) {
-        target = filtered.find(p => p.name?.toLowerCase().includes(targetName.toLowerCase()));
+        target = filteredProfiles.find(p => p.name?.toLowerCase().includes(targetName.toLowerCase()));
       }
 
-      setActiveContact(current => {
-        if (target) return target;
-        if (!current) return filtered[0];
-        const exists = filtered.find(p => p.isGroup ? p.id === current.id : p.email === current.email);
-        return exists ? current : filtered[0];
-      });
+      const timer = setTimeout(() => {
+        setActiveContact(current => {
+          if (target) return target;
+          if (!current) return filteredProfiles[0];
+          const exists = filteredProfiles.find(p => p.isGroup ? p.id === current.id : p.email === current.email);
+          return exists ? current : filteredProfiles[0];
+        });
+      }, 0);
+      return () => clearTimeout(timer);
     } else {
-      setActiveContact(null);
+      const timer = setTimeout(() => {
+        setActiveContact(null);
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [profiles, groups, conversationsMap, activeTab, searchQuery, currentUser, selectedClass]);
+  }, [filteredProfiles]);
 
   // 5. Fetch or Create Conversation
   useEffect(() => {
@@ -318,7 +336,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
           .select('*')
           .or(`and(participant1_email.eq.${currentUser.email},participant2_email.eq.${activeContact.email}),and(participant1_email.eq.${activeContact.email},participant2_email.eq.${currentUser.email})`)
           .maybeSingle();
-          
+
         if (data) {
           setCurrentConversation(data);
         } else if (!error) {
@@ -334,44 +352,54 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
   }, [activeContact, currentUser]);
 
   // 6. Fetch Messages & Realtime Subscription + Typing Broadcast
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     if (!currentConversation) return;
     const { data } = await supabase.from('messages')
       .select('*')
       .eq('conversationId', currentConversation.id)
       .order('createdAt', { ascending: true });
-    
+
     if (data) {
       setMessages(data);
       setTimeout(() => scrollToBottom(false), 50);
     }
-  };
+  }, [currentConversation]);
 
   useEffect(() => {
-    fetchMessages();
-    setTypingUser(null);
-    if (!currentConversation) return;
-    
+    let isMounted = true;
+    const init = async () => {
+      await Promise.resolve();
+      if (!isMounted) return;
+      setTypingUser(null);
+      await fetchMessages();
+    };
+    void init();
+    if (!currentConversation) return () => { isMounted = false; };
+
     const channelName = `public:messages:${currentConversation.id}`;
     const channel = supabase.channel(channelName)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversationId=eq.${currentConversation.id}` }, (payload) => {
+        if (!isMounted) return;
         setMessages(prev => {
           if (prev.some(m => m.id === payload.new.id)) return prev;
           return [...prev, payload.new];
         });
         setTimeout(() => scrollToBottom(true), 50);
-        
+
         if (payload.new.senderEmail !== currentUser?.email) {
-          supabase.from('messages').update({ is_read: true }).eq('id', payload.new.id).then(() => fetchUnreadCounts());
+          supabase.from('messages').update({ is_read: true }).eq('id', payload.new.id).then(() => {
+            if (isMounted) fetchUnreadCounts();
+          });
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversationId=eq.${currentConversation.id}` }, (payload) => {
-        setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
+        if (isMounted) setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `conversationId=eq.${currentConversation.id}` }, (payload) => {
-        setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+        if (isMounted) setMessages(prev => prev.filter(m => m.id !== payload.old.id));
       })
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (!isMounted) return;
         if (payload.senderEmail !== currentUser?.email) {
           if (payload.isTyping) {
             setTypingUser(payload.senderName || 'Someone');
@@ -381,14 +409,15 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
         }
       })
       .subscribe();
-      
+
     activeChannelRef.current = channel;
 
-    return () => { 
-      supabase.removeChannel(channel); 
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
       activeChannelRef.current = null;
     };
-  }, [currentConversation]);
+  }, [currentConversation, currentUser?.email, fetchMessages, fetchUnreadCounts]);
 
   // Mark conversation as read when opened
   useEffect(() => {
@@ -399,12 +428,12 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
         .eq('conversationId', currentConversation.id)
         .neq('senderEmail', currentUser.email)
         .eq('is_read', false);
-        
+
       setUnreadCounts(prev => ({ ...prev, [activeContact.isGroup ? activeContact.id : activeContact.email]: 0 }));
       fetchUnreadCounts();
     };
     markAsRead();
-  }, [currentConversation, activeContact, currentUser]);
+  }, [currentConversation, activeContact, currentUser, fetchUnreadCounts]);
 
   // Typing Input Handler
   const handleInputChange = (e) => {
@@ -558,7 +587,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
     for (const target of targetContacts) {
       try {
         let convId = target.id;
-        
+
         if (!target.isGroup) {
           const { data: existingConv } = await supabase.from('conversations')
             .select('id')
@@ -596,8 +625,8 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
 
           await supabase.from('messages').insert(forwardPayload);
 
-          const previewText = msg.attachment_type === 'image' 
-            ? (msg.text ? `📷 ${msg.text}` : '📷 Photo') 
+          const previewText = msg.attachment_type === 'image'
+            ? (msg.text ? `📷 ${msg.text}` : '📷 Photo')
             : msg.text;
 
           await supabase.from('conversations')
@@ -650,7 +679,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if ((!newMessage.trim() && !stagedImage?.blob) || !currentConversation || !currentUser || isSending || isUploading) return;
-    
+
     const msgText = newMessage.trim();
     const currentStaged = stagedImage;
     const currentReply = stagedReply;
@@ -668,7 +697,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
         payload: { senderEmail: currentUser.email, isTyping: false }
       });
     }
-    
+
     try {
       let attachmentUrl = null;
       let attachmentType = null;
@@ -699,7 +728,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
       };
 
       const { data: insertedMsg, error: msgError } = await supabase.from('messages').insert(payload).select().single();
-      
+
       if (msgError) throw msgError;
 
       setMessages(prev => {
@@ -708,8 +737,8 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
       });
       setTimeout(() => scrollToBottom(true), 50);
 
-      const previewText = attachmentType === 'image' 
-        ? (msgText ? `📷 ${msgText}` : '📷 Photo') 
+      const previewText = attachmentType === 'image'
+        ? (msgText ? `📷 ${msgText}` : '📷 Photo')
         : msgText;
 
       await supabase.from('conversations').update({ lastMessage: previewText, updatedAt: new Date() }).eq('id', currentConversation.id);
@@ -733,9 +762,9 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
       alert("Please enter a group name and select at least one student.");
       return;
     }
-    
+
     const participants = [currentUser.email, ...selectedMembers];
-    
+
     const { error } = await supabase.from('conversations').insert({
       name: newGroupName,
       type: 'group',
@@ -743,7 +772,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
       class_name: selectedClass || null,
       lastMessage: 'Group created'
     });
-    
+
     if (error) {
       alert("Error creating group: " + error.message);
     } else {
@@ -759,8 +788,8 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
     setSelectedMembers(prev => prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]);
   };
 
-  const pinnedMsg = currentConversation?.pinned_message_id 
-    ? messages.find(m => m.id === currentConversation.pinned_message_id) 
+  const pinnedMsg = currentConversation?.pinned_message_id
+    ? messages.find(m => m.id === currentConversation.pinned_message_id)
     : null;
 
   const displayMessages = inChatSearchQuery.trim()
@@ -782,7 +811,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
             </button>
           )}
         </div>
-        
+
         <div className="chat-contacts-list">
           {filteredProfiles.length > 0 ? filteredProfiles.map(contact => {
             const key = contact.isGroup ? contact.id : contact.email;
@@ -801,9 +830,9 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
                     <div className="avatar-placeholder" style={{ background: bgColor }}><Users size={20} /></div>
                   ) : (
                     <div className="presence-avatar-wrapper">
-                      <img 
-                        src={contact.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}&backgroundColor=b6e3f4`} 
-                        alt={displayName} 
+                      <img
+                        src={contact.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}&backgroundColor=b6e3f4`}
+                        alt={displayName}
                         onError={(e) => {
                           e.target.onerror = null;
                           e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}&backgroundColor=b6e3f4`;
@@ -834,7 +863,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
           )}
         </div>
       </div>
-      
+
       {/* Right Pane */}
       <div className={`chat-main-area ${!activeContact ? 'hidden-mobile' : ''}`}>
         {activeContact ? (
@@ -846,9 +875,9 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
                    <div className="avatar-placeholder" style={{ background: (activeContact.name || activeContact.group_name || '').includes('|') ? (activeContact.name || activeContact.group_name).split('|')[0] : 'var(--accent-purple)' }}><Users size={20} /></div>
                 ) : (
                   <div className="presence-avatar-wrapper">
-                    <img 
-                      src={activeContact.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(activeContact.name || 'User')}&backgroundColor=b6e3f4`} 
-                      alt={activeContact.name} 
+                    <img
+                      src={activeContact.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(activeContact.name || 'User')}&backgroundColor=b6e3f4`}
+                      alt={activeContact.name}
                     />
                     {isOnline(activeContact.email) && <span className="presence-dot" />}
                   </div>
@@ -857,20 +886,20 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
               <div className="chat-header-info">
                 <h4>{activeContact.isGroup && (activeContact.name || activeContact.group_name || '').includes('|') ? (activeContact.name || activeContact.group_name).split('|')[1] : (activeContact.name || activeContact.group_name || 'User')}</h4>
                 <span>
-                  {activeContact.isGroup 
-                    ? `Group Chat (${activeContact.participants?.length || 0} members)` 
+                  {activeContact.isGroup
+                    ? `Group Chat (${activeContact.participants?.length || 0} members)`
                     : (isOnline(activeContact.email) ? <span style={{ color: '#10B981', fontWeight: 600 }}>● Active Now</span> : activeContact.email)}
                 </span>
               </div>
               <div className="chat-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="chat-action-btn"
-                  onClick={() => setShowInChatSearch(!showInChatSearch)} 
+                  onClick={() => setShowInChatSearch(!showInChatSearch)}
                   title="Search inside conversation"
                   style={{ background: showInChatSearch ? 'rgba(0, 240, 255, 0.2)' : 'transparent' }}
                 >
-                  <SearchIcon size={18} />
+                  <Search size={18} />
                 </button>
               </div>
             </div>
@@ -879,9 +908,9 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
             {showInChatSearch && (
               <div className="chat-in-search-bar">
                 <Search size={14} style={{ opacity: 0.7 }} />
-                <input 
-                  type="text" 
-                  placeholder="Search in this conversation..." 
+                <input
+                  type="text"
+                  placeholder="Search in this conversation..."
                   className="chat-in-search-input"
                   value={inChatSearchQuery}
                   onChange={(e) => setInChatSearchQuery(e.target.value)}
@@ -897,13 +926,13 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
 
             {/* Pinned Message Banner */}
             {pinnedMsg && (
-              <PinnedMessageBanner 
-                pinnedMessage={pinnedMsg} 
-                onScrollToPinned={() => scrollToMessageId(pinnedMsg.id)} 
-                onUnpin={() => handleTogglePin(pinnedMsg)} 
+              <PinnedMessageBanner
+                pinnedMessage={pinnedMsg}
+                onScrollToPinned={() => scrollToMessageId(pinnedMsg.id)}
+                onUnpin={() => handleTogglePin(pinnedMsg)}
               />
             )}
-            
+
             <div className="chat-messages-area">
               {displayMessages.length === 0 ? (
                 <div className="chat-messages-empty">Say hi to {activeContact.name}!</div>
@@ -917,8 +946,8 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
                   const isDropdownOpen = activeDropdownMsgId === msg.id;
 
                   return (
-                    <div 
-                      key={msg.id || idx} 
+                    <div
+                      key={msg.id || idx}
                       id={`msg-${msg.id}`}
                       className={`chat-bubble-wrapper ${isMe ? 'is-me' : 'is-them'} ${hasReactions ? 'has-reactions' : ''}`}
                     >
@@ -928,11 +957,11 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
                             const sender = profiles.find(p => p.email.toLowerCase() === (msg.senderEmail || '').toLowerCase());
                             const senderFallback = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(msg.senderName || 'User')}&backgroundColor=b6e3f4`;
                             return (
-                              <img 
-                                src={sender?.avatar_url || senderFallback} 
-                                title={msg.senderName} 
-                                alt={msg.senderName} 
-                                style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} 
+                              <img
+                                src={sender?.avatar_url || senderFallback}
+                                title={msg.senderName}
+                                alt={msg.senderName}
+                                style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }}
                                 onError={(e) => { e.target.src = senderFallback; }}
                               />
                             );
@@ -942,7 +971,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
 
                       {/* Outgoing message: action buttons appear to the left of the bubble */}
                       {isMe && !msg.is_deleted && (
-                        <WhatsAppMessageActionToolbar 
+                        <WhatsAppMessageActionToolbar
                           isMe={isMe}
                           isPinned={isPinned}
                           showDropdown={isDropdownOpen}
@@ -962,23 +991,23 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
 
                         {/* Quoted Message */}
                         {msg.reply_to_text && (
-                          <QuotedMessageBubble 
-                            replyToSender={msg.reply_to_sender} 
-                            replyToText={msg.reply_to_text} 
-                            onScrollToOriginal={() => scrollToMessageId(msg.reply_to_id)} 
+                          <QuotedMessageBubble
+                            replyToSender={msg.reply_to_sender}
+                            replyToText={msg.reply_to_text}
+                            onScrollToOriginal={() => scrollToMessageId(msg.reply_to_id)}
                           />
                         )}
 
                         {/* Image Attachment */}
                         {hasImage && (
-                          <div 
+                          <div
                             className="chat-bubble-image-container"
                             onClick={() => setActiveLightboxImg(msg.attachment_url)}
                           >
-                            <img 
-                              src={msg.attachment_url} 
-                              alt="Chat attachment" 
-                              className="chat-bubble-image" 
+                            <img
+                              src={msg.attachment_url}
+                              alt="Chat attachment"
+                              className="chat-bubble-image"
                               loading="lazy"
                             />
                             <div className="chat-bubble-image-overlay" title="Click to enlarge">
@@ -1019,17 +1048,17 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
 
                         {/* WhatsApp-Style Floating Reaction Badge at Bottom Corner */}
                         {!msg.is_deleted && (
-                          <WhatsAppReactionBadge 
-                            reactions={msg.reactions} 
-                            currentEmail={currentUser.email} 
-                            onToggleReaction={(emoji) => handleToggleReaction(msg.id, emoji)} 
+                          <WhatsAppReactionBadge
+                            reactions={msg.reactions}
+                            currentEmail={currentUser.email}
+                            onToggleReaction={(emoji) => handleToggleReaction(msg.id, emoji)}
                           />
                         )}
                       </div>
 
                       {/* Incoming message: action buttons appear to the right of the bubble */}
                       {!isMe && !msg.is_deleted && (
-                        <WhatsAppMessageActionToolbar 
+                        <WhatsAppMessageActionToolbar
                           isMe={isMe}
                           isPinned={isPinned}
                           showDropdown={isDropdownOpen}
@@ -1060,9 +1089,9 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
                   <span className="chat-staged-reply-sender">Replying to {stagedReply.senderName}</span>
                   <span className="chat-staged-reply-text">{stagedReply.text}</span>
                 </div>
-                <button 
-                  type="button" 
-                  className="chat-staged-reply-close" 
+                <button
+                  type="button"
+                  className="chat-staged-reply-close"
                   onClick={() => setStagedReply(null)}
                   title="Cancel reply"
                 >
@@ -1088,9 +1117,9 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
                     )}
                   </div>
                 </div>
-                <button 
-                  type="button" 
-                  className="chat-staged-media-remove" 
+                <button
+                  type="button"
+                  className="chat-staged-media-remove"
                   onClick={handleRemoveStagedImage}
                   title="Remove image"
                 >
@@ -1098,27 +1127,27 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
                 </button>
               </div>
             )}
-            
+
             <form className="chat-input-area" onSubmit={handleSendMessage} style={{ position: 'relative' }}>
               {/* WhatsApp Emoji Picker Dropdown */}
               {showEmojiPicker && (
-                <EmojiPicker 
-                  onSelectEmoji={handleInsertEmoji} 
-                  onClose={() => setShowEmojiPicker(false)} 
+                <EmojiPicker
+                  onSelectEmoji={handleInsertEmoji}
+                  onClose={() => setShowEmojiPicker(false)}
                 />
               )}
 
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                accept="image/*" 
-                style={{ display: 'none' }} 
-                onChange={handleFileSelect} 
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleFileSelect}
               />
-              <button 
-                type="button" 
-                className="chat-attach-btn" 
-                onClick={() => fileInputRef.current?.click()} 
+              <button
+                type="button"
+                className="chat-attach-btn"
+                onClick={() => fileInputRef.current?.click()}
                 title="Share Image (Auto-compressed to JPEG ≤ 2MB)"
                 disabled={isSending || isUploading || stagedImage?.isCompressing}
               >
@@ -1126,29 +1155,29 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
               </button>
 
               {/* WhatsApp Smile Emoji Button */}
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className={`chat-attach-btn ${showEmojiPicker ? 'active' : ''}`}
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 title="Insert Emoji"
                 style={{ color: showEmojiPicker ? 'var(--brand-primary, #00F0FF)' : 'inherit' }}
               >
                 <Smile size={20} />
               </button>
 
-              <input 
+              <input
                 ref={chatInputRef}
-                type="text" 
-                placeholder={stagedImage ? "Add a caption..." : (stagedReply ? `Reply to ${stagedReply.senderName}...` : "Type a message...")} 
-                className="chat-input" 
-                value={newMessage} 
-                onChange={handleInputChange} 
+                type="text"
+                placeholder={stagedImage ? "Add a caption..." : (stagedReply ? `Reply to ${stagedReply.senderName}...` : "Type a message...")}
+                className="chat-input"
+                value={newMessage}
+                onChange={handleInputChange}
                 disabled={isSending || isUploading}
               />
 
-              <button 
-                type="submit" 
-                className="chat-send-btn" 
+              <button
+                type="submit"
+                className="chat-send-btn"
                 disabled={(!newMessage.trim() && !stagedImage?.blob) || isSending || isUploading || stagedImage?.isCompressing}
                 title="Send Message"
               >
@@ -1175,12 +1204,12 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
             <p>Select students to assign to this group activity.</p>
             <form onSubmit={handleCreateGroup}>
               <input type="text" placeholder="Group Name (e.g., Team Alpha)" required value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} />
-              
+
               <div style={{ maxHeight: '200px', overflowY: 'auto', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '10px', margin: '15px 0' }}>
                 {profiles.filter(p => p.role === 'student').map(student => (
                   <label key={student.email} style={{ display: 'flex', alignItems: 'center', padding: '8px', cursor: 'pointer', gap: '10px' }}>
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={selectedMembers.includes(student.email)}
                       onChange={() => toggleMemberSelection(student.email)}
                     />
@@ -1191,7 +1220,7 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
                   </label>
                 ))}
               </div>
-              
+
               <div className="chat-modal-actions">
                 <button type="button" className="btn-ghost" onClick={() => setShowGroupModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary">Create Group</button>
@@ -1203,19 +1232,19 @@ export default function ChatInterface({ currentUser: propUser, activeTab, select
 
       {/* WhatsApp Forward Modal */}
       {forwardModalMessage && (
-        <ForwardMessageModal 
-          message={forwardModalMessage} 
-          contacts={filteredProfiles} 
-          onForward={handleForwardMessage} 
-          onClose={() => setForwardModalMessage(null)} 
+        <ForwardMessageModal
+          message={forwardModalMessage}
+          contacts={filteredProfiles}
+          onForward={handleForwardMessage}
+          onClose={() => setForwardModalMessage(null)}
         />
       )}
 
       {/* Lightbox Modal */}
       {activeLightboxImg && (
-        <ImageLightbox 
-          imageUrl={activeLightboxImg} 
-          onClose={() => setActiveLightboxImg(null)} 
+        <ImageLightbox
+          imageUrl={activeLightboxImg}
+          onClose={() => setActiveLightboxImg(null)}
         />
       )}
     </div>

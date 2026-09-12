@@ -2,7 +2,6 @@ import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, FlaskConical, Glasses, Lightbulb, ListChecks } from "lucide-react";
 import useThreeScene from "../hooks/useThreeScene";
-import AITutorWidget from "../components/AITutorWidget";
 import { SmartboardOverlay, TopControls } from "./StudyIslandView";
 import chapterBackground from "../../assets/chapter background lowres.jpg";
 
@@ -81,5 +80,5 @@ export default function ChapterDetailView() {
     <div className="solar-chapter-header"><div className="solar-chapter-accent-line" /><h2 className="solar-chapter-title">LIGHT AND SHADOWS</h2></div>
     <div className="chapter-main-panel glass-panel-card"><div className="chapter-tab-nav" role="tablist" aria-label="Chapter sections">{tabs.map(([id, label, Icon]) => <button key={id} className={`sol-tab ${activeTab === id ? "active-tab" : ""}`} type="button" onClick={() => setActiveTab(id)} role="tab" aria-selected={activeTab === id}><Icon className="sol-tab-solo-icon" /><span className="sol-tab-label">{label}</span></button>)}</div><div className="tab-panels-area">{content}</div></div>
     <div className="sol-bottom-nav-row"><button className="sol-nav-btn" type="button" onClick={() => { if (window.history.state && window.history.state.idx > 0) { navigate(-1); } else { navigate("/?screen=chapters"); } }}>← Back</button><button className="sol-nav-btn" type="button" onClick={() => navigate("/")}>⌂ Home</button></div>
-  </div></section><SmartboardOverlay /><AITutorWidget /></div>;
+  </div></section><SmartboardOverlay /></div>;
 }

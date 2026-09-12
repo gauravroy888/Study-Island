@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Card from '../components/Card';
 import { 
@@ -8,22 +8,94 @@ import {
   BookOpen, 
   Play, 
   Layers, 
-  Atom, 
-  Globe, 
-  Compass, 
   Search, 
-  ExternalLink, 
   Presentation, 
-  Users, 
-  CheckCircle2, 
-  Zap, 
-  Volume2,
-  ChevronRight,
   ArrowUpRight
 } from 'lucide-react';
 import { supabase } from '../supabase';
 
 const R2_PUBLIC_CDN_URL = 'https://pub-670b98370fe642a2be08ee37cbfd385f.r2.dev';
+
+function getCurriculumData(className) {
+  return [
+    {
+      id: 'cur-1',
+      title: `${className} Science: Optics, Light & 3D Simulations`,
+      subject: 'Science',
+      category: 'Science',
+      icon: '💡',
+      level: 'Interactive 3D / IFP Ready',
+      smartboardFeatured: true,
+      description: 'Ray propagation, convex/concave mirror reflections, shadow formation, and interactive laboratory simulations.',
+      thumbnail: `${R2_PUBLIC_CDN_URL}/placeholders/optics.webp`,
+      chapters: [
+        { id: 'ch-1', chapterId: 'light-shadows', title: 'Chapter 1: Light Sources, Propagation & Shadows', type: '3D Simulation', duration: '45 mins' },
+        { id: 'ch-2', chapterId: 'light-shadows', title: 'Chapter 2: Reflection, Lenses & Focal Points', type: 'Smartboard Lab', duration: '50 mins' },
+        { id: 'ch-3', chapterId: 'space-solar', title: 'Chapter 3: The Solar System & Planetary Orbits', type: 'VR / 3D Space', duration: '40 mins' }
+      ]
+    },
+    {
+      id: 'cur-2',
+      title: `${className} Ancient & World Civilizations`,
+      subject: 'History',
+      category: 'History',
+      icon: '🏛️',
+      level: 'Smartboard Visual Era',
+      smartboardFeatured: true,
+      description: 'Interactive timeline explorations, 3D architectural ruins, Harappan cities, and ancient trade routes.',
+      thumbnail: `${R2_PUBLIC_CDN_URL}/placeholders/history.webp`,
+      chapters: [
+        { id: 'ch-4', chapterId: null, title: 'Chapter 1: Indus Valley Architecture & Drainage 3D', type: '3D Walkthrough', duration: '35 mins' },
+        { id: 'ch-5', chapterId: null, title: 'Chapter 2: Mesopotamian & Egyptian Empires', type: 'Interactive Map', duration: '40 mins' }
+      ]
+    },
+    {
+      id: 'cur-3',
+      title: `${className} World Physical Geography & Tectonics`,
+      subject: 'Geography',
+      category: 'Geography',
+      icon: '🌍',
+      level: '3D Earth Engine',
+      smartboardFeatured: true,
+      description: 'Interactive globe rendering, continental plate tectonics, volcano cross-sections, and climate zones.',
+      thumbnail: `${R2_PUBLIC_CDN_URL}/placeholders/geography.webp`,
+      chapters: [
+        { id: 'ch-6', chapterId: null, title: 'Chapter 1: Continental Drift & Plate Boundaries', type: '3D Simulation', duration: '45 mins' },
+        { id: 'ch-7', chapterId: null, title: 'Chapter 2: Atmospheric Pressure & Weather Systems', type: 'Live Simulator', duration: '40 mins' }
+      ]
+    },
+    {
+      id: 'cur-4',
+      title: `${className} Mathematics, Geometry & Spatial Proofs`,
+      subject: 'Mathematics',
+      category: 'Mathematics',
+      icon: '📐',
+      level: 'Smartboard Canvas',
+      smartboardFeatured: false,
+      description: 'Visual geometric proofs, coordinate Cartesian planes, dynamic angle manipulation, and algebraic formulas.',
+      thumbnail: `${R2_PUBLIC_CDN_URL}/placeholders/math.webp`,
+      chapters: [
+        { id: 'ch-8', chapterId: null, title: 'Chapter 1: Triangles, Angles & Congruence Theorems', type: 'Interactive Canvas', duration: '45 mins' },
+        { id: 'ch-9', chapterId: null, title: 'Chapter 2: 3D Mensuration: Cones, Cylinders & Spheres', type: '3D Geometry', duration: '50 mins' }
+      ]
+    },
+    {
+      id: 'cur-5',
+      title: `${className} English Literature, Grammar & Interactive Drama`,
+      subject: 'English',
+      category: 'English',
+      icon: '📝',
+      level: 'Narrative Presentation',
+      smartboardFeatured: false,
+      description: 'Interactive Shakespearean & classic prose stage visualizer, vocabulary flashboards, and syntax analyzers.',
+      thumbnail: `${R2_PUBLIC_CDN_URL}/placeholders/english.webp`,
+      chapters: [
+        { id: 'ch-10', chapterId: null, title: 'Chapter 1: Narrative Story Arc & Character Perspectives', type: 'Visual Storyboard', duration: '35 mins' },
+        { id: 'ch-11', chapterId: null, title: 'Chapter 2: Active vs Passive Voice Live Smartboard Drill', type: 'Class Quiz', duration: '30 mins' }
+      ]
+    }
+  ];
+}
 
 export default function SmartboardTeaching() {
   const [searchParams] = useSearchParams();
@@ -35,26 +107,25 @@ export default function SmartboardTeaching() {
   const [selectedSubject, setSelectedSubject] = useState(initialSubject);
   const [searchQuery, setSearchQuery] = useState('');
   const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [activePresentation, setActivePresentation] = useState(null); // Embedded Smartboard player
 
   // Load teacher assigned classes
   useEffect(() => {
     async function loadAssignedClasses() {
       try {
-        const { data } = await supabase.from('classes').select('*').order('created_at', { ascending: true });
+        const { data } = await supabase.from('classes').select('*').eq('name', 'Class 6th').eq('is_archived', false);
         if (data && data.length > 0) {
           setAssignedClasses(data);
         } else {
           setAssignedClasses([
-            { id: '1', name: 'Class 6th Science', section: 'Standard Curriculum', subject: 'Science & Physics', students: 0 },
-            { id: '2', name: 'Class 7th Astronomy', section: 'Standard Curriculum', subject: 'Space & Solar System', students: 0 },
-            { id: '3', name: 'Class 8th Earth Science', section: 'Standard Curriculum', subject: 'Geography & Geology', students: 0 },
-            { id: '4', name: 'Class 9th Physics', section: 'Standard Curriculum', subject: 'Optics & Mechanics', students: 0 }
+            { id: '1', name: 'Class 6th Science', section: 'Standard Curriculum', subject: 'Science & Physics', students: 5 }
           ]);
         }
       } catch (e) {
         console.error('Failed to load classes:', e);
+        setAssignedClasses([
+          { id: '1', name: 'Class 6th Science', section: 'Standard Curriculum', subject: 'Science & Physics', students: 5 }
+        ]);
       }
     }
     loadAssignedClasses();
@@ -63,7 +134,6 @@ export default function SmartboardTeaching() {
   // Fetch courses matching selected assigned class
   useEffect(() => {
     async function fetchCurriculum() {
-      setLoading(true);
       try {
         const normalizedClassName = selectedClass.includes('Class') ? selectedClass.split(' ')[0] + ' ' + selectedClass.split(' ')[1] : selectedClass;
         
@@ -87,94 +157,13 @@ export default function SmartboardTeaching() {
       } catch (err) {
         console.error('Error loading course curriculum:', err);
         setCourses(getCurriculumData(selectedClass));
-      } finally {
-        setLoading(false);
       }
     }
 
     fetchCurriculum();
   }, [selectedClass]);
 
-  function getCurriculumData(className) {
-    return [
-      {
-        id: 'cur-1',
-        title: `${className} Science: Optics, Light & 3D Simulations`,
-        subject: 'Science',
-        category: 'Science',
-        icon: '💡',
-        level: 'Interactive 3D / IFP Ready',
-        smartboardFeatured: true,
-        description: 'Ray propagation, convex/concave mirror reflections, shadow formation, and interactive laboratory simulations.',
-        thumbnail: `${R2_PUBLIC_CDN_URL}/placeholders/optics.webp`,
-        chapters: [
-          { id: 'ch-1', chapterId: 'light-shadows', title: 'Chapter 1: Light Sources, Propagation & Shadows', type: '3D Simulation', duration: '45 mins' },
-          { id: 'ch-2', chapterId: 'light-shadows', title: 'Chapter 2: Reflection, Lenses & Focal Points', type: 'Smartboard Lab', duration: '50 mins' },
-          { id: 'ch-3', chapterId: 'space-solar', title: 'Chapter 3: The Solar System & Planetary Orbits', type: 'VR / 3D Space', duration: '40 mins' }
-        ]
-      },
-      {
-        id: 'cur-2',
-        title: `${className} Ancient & World Civilizations`,
-        subject: 'History',
-        category: 'History',
-        icon: '🏛️',
-        level: 'Smartboard Visual Era',
-        smartboardFeatured: true,
-        description: 'Interactive timeline explorations, 3D architectural ruins, Harappan cities, and ancient trade routes.',
-        thumbnail: `${R2_PUBLIC_CDN_URL}/placeholders/history.webp`,
-        chapters: [
-          { id: 'ch-4', chapterId: null, title: 'Chapter 1: Indus Valley Architecture & Drainage 3D', type: '3D Walkthrough', duration: '35 mins' },
-          { id: 'ch-5', chapterId: null, title: 'Chapter 2: Mesopotamian & Egyptian Empires', type: 'Interactive Map', duration: '40 mins' }
-        ]
-      },
-      {
-        id: 'cur-3',
-        title: `${className} World Physical Geography & Tectonics`,
-        subject: 'Geography',
-        category: 'Geography',
-        icon: '🌍',
-        level: '3D Earth Engine',
-        smartboardFeatured: true,
-        description: 'Interactive globe rendering, continental plate tectonics, volcano cross-sections, and climate zones.',
-        thumbnail: `${R2_PUBLIC_CDN_URL}/placeholders/geography.webp`,
-        chapters: [
-          { id: 'ch-6', chapterId: null, title: 'Chapter 1: Continental Drift & Plate Boundaries', type: '3D Simulation', duration: '45 mins' },
-          { id: 'ch-7', chapterId: null, title: 'Chapter 2: Atmospheric Pressure & Weather Systems', type: 'Live Simulator', duration: '40 mins' }
-        ]
-      },
-      {
-        id: 'cur-4',
-        title: `${className} Mathematics, Geometry & Spatial Proofs`,
-        subject: 'Mathematics',
-        category: 'Mathematics',
-        icon: '📐',
-        level: 'Smartboard Canvas',
-        smartboardFeatured: false,
-        description: 'Visual geometric proofs, coordinate Cartesian planes, dynamic angle manipulation, and algebraic formulas.',
-        thumbnail: `${R2_PUBLIC_CDN_URL}/placeholders/math.webp`,
-        chapters: [
-          { id: 'ch-8', chapterId: null, title: 'Chapter 1: Triangles, Angles & Congruence Theorems', type: 'Interactive Canvas', duration: '45 mins' },
-          { id: 'ch-9', chapterId: null, title: 'Chapter 2: 3D Mensuration: Cones, Cylinders & Spheres', type: '3D Geometry', duration: '50 mins' }
-        ]
-      },
-      {
-        id: 'cur-5',
-        title: `${className} English Literature, Grammar & Interactive Drama`,
-        subject: 'English',
-        category: 'English',
-        icon: '📝',
-        level: 'Narrative Presentation',
-        smartboardFeatured: false,
-        description: 'Interactive Shakespearean & classic prose stage visualizer, vocabulary flashboards, and syntax analyzers.',
-        thumbnail: `${R2_PUBLIC_CDN_URL}/placeholders/english.webp`,
-        chapters: [
-          { id: 'ch-10', chapterId: null, title: 'Chapter 1: Narrative Story Arc & Character Perspectives', type: 'Visual Storyboard', duration: '35 mins' },
-          { id: 'ch-11', chapterId: null, title: 'Chapter 2: Active vs Passive Voice Live Smartboard Drill', type: 'Class Quiz', duration: '30 mins' }
-        ]
-      }
-    ];
-  }
+
 
   // Get base URL for Study Island
   function getStudyIslandUrl(options = {}) {
@@ -201,7 +190,9 @@ export default function SmartboardTeaching() {
         if (u.id || u.teacher_id) params.set('teacher_id', u.id || u.teacher_id);
         if (u.department || u.degree) params.set('teacher_dept', u.department || u.degree);
       }
-    } catch(e) {}
+    } catch {
+      /* ignore error */
+    }
 
     return `${url}?${params.toString()}`;
   }

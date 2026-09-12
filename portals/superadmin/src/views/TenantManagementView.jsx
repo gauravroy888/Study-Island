@@ -1,6 +1,60 @@
 import React from 'react';
-import { DEFAULT_CLASSES, SUPABASE_CONFIG } from '../constants.js';
-import { SUPABASE_URL, SUPABASE_KEY } from '../supabase.js';
+import { DEFAULT_CLASSES } from '../constants.js';
+import { supabase } from '../supabase.js';
+
+function MemberTable({ members, color, roleLabel, onOnboardClick, onRoleChange, onStatusToggle }) {
+  if (members.length === 0) {
+    return (
+      <div className="text-center py-12 text-slate-500 text-sm">
+        <i className={`ph ph-${roleLabel === 'student' ? 'student' : roleLabel === 'teacher' ? 'chalkboard-teacher' : 'shield-check'} text-4xl block mb-2 opacity-40`}></i>
+        No {roleLabel}s added yet.{' '}
+        <button onClick={onOnboardClick} className="text-cyan-400 underline">Add one →</button>
+      </div>
+    );
+  }
+
+  return (
+    <table className="w-full text-left text-xs">
+      <thead className="text-slate-400 font-mono uppercase border-b border-slate-800 text-[10px]">
+        <tr>
+          <th className="pb-2.5">Name</th>
+          <th className="pb-2.5">Email</th>
+          <th className="pb-2.5">Status</th>
+          <th className="pb-2.5">Joined</th>
+          <th className="pb-2.5 text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-800/60">
+        {members.map(u => (
+          <tr key={u.id} className="hover:bg-slate-800/30 transition">
+            <td className="py-3 flex items-center gap-2.5">
+              <div className={`w-7 h-7 rounded-full bg-${color}-500/20 border border-${color}-500/30 flex items-center justify-center text-${color}-400 font-bold text-[10px]`}>{u.name.slice(0,2).toUpperCase()}</div>
+              <span className="text-white font-semibold">{u.name}</span>
+            </td>
+            <td className="py-3 text-slate-400 font-mono text-[11px]">{u.email}</td>
+            <td className="py-3">
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${u.status === 'Active' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-red-500/20 text-red-400 border border-red-500/40'}`}>{u.status}</span>
+            </td>
+            <td className="py-3 text-slate-500 font-mono text-[11px]">{u.joined}</td>
+            <td className="py-3 text-right space-x-1.5">
+              {roleLabel !== 'student' && (
+                <select value={u.role} onChange={(e) => onRoleChange(u.id, e.target.value)}
+                  className="bg-slate-900 border border-slate-700 text-white rounded-lg px-2 py-1 text-[11px] font-bold focus:border-cyan-400">
+                  <option value="ADMIN">🛡️ ADMIN</option>
+                  <option value="TEACHER">🎓 TEACHER</option>
+                  <option value="STUDENT">📖 STUDENT</option>
+                </select>
+              )}
+              <button onClick={() => onStatusToggle(u.id)} className={`px-2.5 py-1 rounded-lg font-bold text-[11px] ${u.status === 'Active' ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'}`}>
+                {u.status === 'Active' ? 'Suspend' : 'Reactivate'}
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 export function TenantManagementView({ orgs, users, searchTerm, onOpenModal, onRoleChange, onStatusToggle }) {
       const [selectedSchool, setSelectedSchool] = React.useState(null);
@@ -30,13 +84,10 @@ export function TenantManagementView({ orgs, users, searchTerm, onOpenModal, onR
       React.useEffect(() => {
         async function fetchSupabaseClasses() {
           try {
-            const SUPABASE_URL = 'https://qmyrxvtbzlbnvzxypnus.supabase.co';
-            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFteXJ4dnRiemxibnZ6eHlwbnVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA4OTcsImV4cCI6MjA5NTM5Njg5N30.ABvW_oBzXC2Ffxm5ToLh6t4WmdKPdtg9SyfeAE76iJo';
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/classes?select=*`, {
-              headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-            });
-            const dbClasses = await res.json();
-            if (Array.isArray(dbClasses) && dbClasses.length > 0) {
+            const { data: dbClasses, error } = await supabase.from('classes').select('*');
+            if (error) {
+              console.warn('Failed to load Supabase classes via supabase client:', error.message);
+            } else if (Array.isArray(dbClasses) && dbClasses.length > 0) {
               const sorted = dbClasses.sort((a, b) => {
                 const numA = parseInt(a.name.replace(/\D/g, '')) || 0;
                 const numB = parseInt(b.name.replace(/\D/g, '')) || 0;
@@ -88,17 +139,14 @@ export function TenantManagementView({ orgs, users, searchTerm, onOpenModal, onR
         setTimeout(() => setSubjectSuccessToast(''), 4000);
 
         try {
-          const SUPABASE_URL = 'https://qmyrxvtbzlbnvzxypnus.supabase.co';
-          const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFteXJ4dnRiemxibnZ6eHlwbnVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA4OTcsImV4cCI6MjA5NTM5Njg5N30.ABvW_oBzXC2Ffxm5ToLh6t4WmdKPdtg9SyfeAE76iJo';
-          await fetch(`${SUPABASE_URL}/rest/v1/classes?id=eq.${classId}`, {
-            method: 'PATCH',
-            headers: {
-              'apikey': SUPABASE_KEY,
-              'Authorization': `Bearer ${SUPABASE_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ subject: cleaned })
-          });
+          const { error: patchError } = await supabase
+            .from('classes')
+            .update({ subject: cleaned })
+            .eq('id', classId);
+
+          if (patchError) {
+            console.error('Failed to sync subject to Supabase:', patchError.message);
+          }
         } catch (err) {
           console.error('Failed to sync subject to Supabase:', err);
         }
@@ -180,7 +228,7 @@ export function TenantManagementView({ orgs, users, searchTerm, onOpenModal, onR
         setTimeout(() => setOnboardSuccess(''), 5000);
       };
 
-      const parseFileText = (text, fileName) => {
+      const parseFileText = (text, _fileName) => {
         setCsvError('');
         setCsvParsed([]);
         try {
@@ -293,56 +341,6 @@ export function TenantManagementView({ orgs, users, searchTerm, onOpenModal, onR
           { id: 'onboard',   label: 'Onboard Member',  icon: 'ph-user-plus' },
         ];
 
-        const MemberTable = ({ members, color, roleLabel, addLabel }) => (
-          members.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 text-sm">
-              <i className={`ph ph-${roleLabel === 'student' ? 'student' : roleLabel === 'teacher' ? 'chalkboard-teacher' : 'shield-check'} text-4xl block mb-2 opacity-40`}></i>
-              No {roleLabel}s added yet.{' '}
-              <button onClick={() => setSchoolView('onboard')} className="text-cyan-400 underline">Add one →</button>
-            </div>
-          ) : (
-            <table className="w-full text-left text-xs">
-              <thead className="text-slate-400 font-mono uppercase border-b border-slate-800 text-[10px]">
-                <tr>
-                  <th className="pb-2.5">Name</th>
-                  <th className="pb-2.5">Email</th>
-                  <th className="pb-2.5">Status</th>
-                  <th className="pb-2.5">Joined</th>
-                  <th className="pb-2.5 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {members.map(u => (
-                  <tr key={u.id} className="hover:bg-slate-800/30 transition">
-                    <td className="py-3 flex items-center gap-2.5">
-                      <div className={`w-7 h-7 rounded-full bg-${color}-500/20 border border-${color}-500/30 flex items-center justify-center text-${color}-400 font-bold text-[10px]`}>{u.name.slice(0,2).toUpperCase()}</div>
-                      <span className="text-white font-semibold">{u.name}</span>
-                    </td>
-                    <td className="py-3 text-slate-400 font-mono text-[11px]">{u.email}</td>
-                    <td className="py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${u.status === 'Active' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-red-500/20 text-red-400 border border-red-500/40'}`}>{u.status}</span>
-                    </td>
-                    <td className="py-3 text-slate-500 font-mono text-[11px]">{u.joined}</td>
-                    <td className="py-3 text-right space-x-1.5">
-                      {roleLabel !== 'student' && (
-                        <select value={u.role} onChange={(e) => onRoleChange(u.id, e.target.value)}
-                          className="bg-slate-900 border border-slate-700 text-white rounded-lg px-2 py-1 text-[11px] font-bold focus:border-cyan-400">
-                          <option value="ADMIN">🛡️ ADMIN</option>
-                          <option value="TEACHER">🎓 TEACHER</option>
-                          <option value="STUDENT">📖 STUDENT</option>
-                        </select>
-                      )}
-                      <button onClick={() => onStatusToggle(u.id)} className={`px-2.5 py-1 rounded-lg font-bold text-[11px] ${u.status === 'Active' ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'}`}>
-                        {u.status === 'Active' ? 'Suspend' : 'Reactivate'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )
-        );
-
         return (
           <div className="space-y-5">
             {/* Breadcrumb */}
@@ -438,7 +436,14 @@ export function TenantManagementView({ orgs, users, searchTerm, onOpenModal, onR
                   <h4 className="text-white font-bold text-sm flex items-center gap-2"><i className="ph ph-student text-emerald-400"></i> Enrolled Students</h4>
                   <button onClick={() => { setSchoolView('onboard'); setOnboardForm(f => ({...f, role:'STUDENT'})); }} className="px-3 py-1.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs flex items-center gap-1.5"><i className="ph ph-user-plus"></i> Enroll Student</button>
                 </div>
-                <MemberTable members={schoolStudents} color="emerald" roleLabel="student" />
+                <MemberTable
+                  members={schoolStudents}
+                  color="emerald"
+                  roleLabel="student"
+                  onOnboardClick={() => setSchoolView('onboard')}
+                  onRoleChange={onRoleChange}
+                  onStatusToggle={onStatusToggle}
+                />
               </div>
             )}
 

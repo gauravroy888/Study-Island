@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { BookOpen, Users, UserCheck, Plus, ChevronRight, Activity, Award, X, Loader2, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, UserCheck, Plus, ChevronRight, X, Loader2, AlertCircle } from 'lucide-react';
 import Card from '../components/Card';
 import { supabase } from '../supabase';
 
@@ -28,6 +28,10 @@ export default function Classes() {
         .from('classes')
         .select('*')
         .order('display_order', { ascending: true });
+
+      if (clsErr) {
+        console.warn('Classes fetch note:', clsErr.message);
+      }
 
       // 2. Fetch real students
       const { data: dbStudents } = await supabase
@@ -73,7 +77,14 @@ export default function Classes() {
   };
 
   useEffect(() => {
-    loadDatabaseData();
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await loadDatabaseData();
+    };
+    void init();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleAddClass = async (e) => {

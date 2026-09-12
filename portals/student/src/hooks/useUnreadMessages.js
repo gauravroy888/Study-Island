@@ -3,20 +3,19 @@ import { supabase } from '../supabase';
 
 export function useUnreadMessages() {
   const [totalUnread, setTotalUnread] = useState(0);
-  const [currentUserEmail, setCurrentUserEmail] = useState(null);
-
-  // Read user email and listen for auth changes (fixes stale closure)
-  useEffect(() => {
-    // Get initial user from localStorage
+  const [currentUserEmail, setCurrentUserEmail] = useState(() => {
     try {
       const userStr = localStorage.getItem('edtech_user');
       if (userStr) {
         const u = JSON.parse(userStr);
-        if (u.email) setCurrentUserEmail(u.email);
+        return u.email || null;
       }
-    } catch (e) {}
+    } catch { /* ignore parse errors */ }
+    return null;
+  });
 
-    // Also listen for supabase auth state to catch late-loading sessions
+  // Listen for supabase auth state to catch late-loading sessions
+  useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user?.email) {
         setCurrentUserEmail(session.user.email);
@@ -57,7 +56,7 @@ export function useUnreadMessages() {
           const count = unreadMsgs.filter(m => m.senderEmail !== currentUserEmail).length;
           setTotalUnread(count);
         }
-      } catch (err) {
+      } catch {
         // Fail silently
       }
     };

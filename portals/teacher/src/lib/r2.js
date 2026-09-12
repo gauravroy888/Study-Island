@@ -1,52 +1,68 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { supabase } from '../supabase';
 
-// ─── Cloudflare R2 Configuration ──────────────────────────────────────────────
-const R2_ACCOUNT_ID     = '21b75f7da0ec0dde4d08d3f19d2102f3';
-const R2_ACCESS_KEY_ID  = '5fd10d137b4e437c604356c7d14b138c';
-const R2_SECRET_KEY     = '229ede3cbc0f2264b9f72545eecf99c12a5e9e06699ba9da08d7544458755693';
-const R2_BUCKET         = 'edtechplatform';
-export const R2_PUBLIC_URL = 'https://pub-670b98370fe642a2be08ee37cbfd385f.r2.dev';
-// ──────────────────────────────────────────────────────────────────────────────
+export const R2_PUBLIC_URL = import.meta.env.VITE_CLOUDFLARE_R2_PUBLIC_URL || 'https://pub-670b98370fe642a2be08ee37cbfd385f.r2.dev';
 
-const r2 = new S3Client({
-  region: 'auto',
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_KEY,
-  },
-});
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result;
+      if (typeof dataUrl === 'string') {
+        const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+        resolve(base64);
+      } else {
+        reject(new Error('Failed to convert blob to base64'));
+      }
+    };
+    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+    reader.readAsDataURL(blob);
+  });
+}
 
 /**
- * Uploads a JPEG Blob directly to Cloudflare R2 and returns its public CDN URL.
- * Uses a presigned PUT URL so no server/Edge Function is needed.
+ * Uploads an image Blob securely via backend /api/upload-r2 endpoint and returns its public CDN URL.
+ * Cloudflare R2 secrets are never present in frontend client bundles.
  *
- * @param {Blob}   blob         - Compressed JPEG blob (from compressToJpeg)
+ * @param {Blob}   blob         - Compressed image blob (from compressToJpeg)
  * @param {string} originalName - Original filename (used only for reference)
  * @returns {Promise<string>} Public CDN URL of the uploaded image
  */
 export async function uploadImageToR2(blob, originalName = 'photo.jpg') {
-  const uid = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-  const key = `chat/${uid}.jpg`;
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || '';
 
-  const command = new PutObjectCommand({
-    Bucket: R2_BUCKET,
-    Key: key,
-    ContentType: 'image/jpeg',
-  });
+  if (!token) {
+    throw new Error('Authentication required to upload media.');
+  }
 
-  const presignedUrl = await getSignedUrl(r2, command, { expiresIn: 300 });
+  const base64Content = await blobToBase64(blob);
 
-  const res = await fetch(presignedUrl, {
-    method: 'PUT',
-    body: blob,
-    headers: { 'Content-Type': 'image/jpeg' },
+  const res = await fetch('/api/upload-r2', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      filename: originalName || 'photo.jpg',
+      base64Content,
+      contentType: blob.type || 'image/jpeg',
+      className: 'general',
+      subjectName: 'chat',
+      chapterSlug: 'media',
+      modalitySlug: 'multi'
+    })
   });
 
   if (!res.ok) {
-    throw new Error(`R2 upload failed (${res.status}): ${await res.text()}`);
+    const errText = await res.text();
+    throw new Error(`R2 upload failed (${res.status}): ${errText}`);
   }
 
-  return `${R2_PUBLIC_URL}/${key}`;
+  const data = await res.json();
+  if (!data.ok || !data.cdnUrl) {
+    throw new Error(data.error || 'R2 upload failed');
+  }
+
+  return data.cdnUrl;
 }

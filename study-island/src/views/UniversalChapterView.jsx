@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { BookOpen, FlaskConical, Glasses, Lightbulb, ListChecks } from "lucide-react";
 import useThreeScene from "../hooks/useThreeScene";
-import AITutorWidget from "../components/AITutorWidget";
 import { SmartboardOverlay, TopControls, recordRecentChapter } from "./StudyIslandView";
 import chapterBackground from "../../assets/chapter background lowres.jpg";
 import { supabase } from "../supabase";
@@ -421,7 +420,21 @@ function StoriesPanel({ data }) {
 function SimplePanel({ type, data }) {
   const navigate = useNavigate();
   if (type === "quiz") {
-    if (data.isLightAndShadows) {
+    const hasQuiz = data.isLightAndShadows || data.quiz_ready || Boolean(data.quiz_url);
+    if (hasQuiz) {
+      const targetQuizUrl = data.quiz_url || (data.isLightAndShadows ? '/data/light_and_shadows_quiz.csv' : '');
+      const handleQuizLaunch = () => {
+        if (targetQuizUrl) {
+          const params = new URLSearchParams();
+          params.set('quiz_url', targetQuizUrl);
+          if (data.id) params.set('chapter_id', data.id);
+          if (data.title) params.set('chapter_title', data.title);
+          if (data.chapter_slug) params.set('chapter_slug', data.chapter_slug);
+          navigate(`/quiz?${params.toString()}`);
+        } else {
+          navigate("/quiz");
+        }
+      };
       return (
         <div className="sol-tab-panel active">
           <div className="sol-unlocked-panel" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
@@ -432,14 +445,14 @@ function SimplePanel({ type, data }) {
                 <h3 className="sol-unlocked-title" style={{ fontSize: "2.2rem", fontWeight: 700, marginBottom: "12px", color: "var(--text-primary)", letterSpacing: "0.5px" }}>{data.title || "Chapter"} Quiz</h3>
                 <p className="sol-unlocked-desc" style={{ color: "var(--text-muted)", marginBottom: "30px", fontSize: "1.15rem" }}>Test your mastery on {data.title || "this chapter"}.</p>
                 <div style={{ display: "flex", gap: "16px", marginBottom: "40px", flexWrap: "wrap", justifyContent: "center" }}>
-                  <span className="glass-mini" style={{ padding: "8px 16px", color: "#cbd5e1" }}>☷ 10 Questions</span>
+                  <span className="glass-mini" style={{ padding: "8px 16px", color: "#cbd5e1" }}>☷ Assessment Quiz</span>
                   <span className="glass-mini" style={{ padding: "8px 16px", color: "#cbd5e1" }}>◷ 15 Mins</span>
                   <span className="glass-mini" style={{ padding: "8px 16px", color: "#cbd5e1" }}>★ +50 XP</span>
                 </div>
                 <button
                   className="sol-start-btn"
                   type="button"
-                  onClick={() => navigate("/quiz")}
+                  onClick={handleQuizLaunch}
                   aria-label="Start Quiz"
                 >
                   Start Quiz <span style={{ marginLeft: "8px" }}>→</span>
@@ -504,7 +517,7 @@ export default function UniversalChapterView({ studentContext }) {
       try {
         setLoading(true);
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chapterId);
-        let query = supabase.from("course_chapters").select("*");
+        let query = supabase.from("course_chapters").select("*, subjects(id, name)");
         if (isUUID) {
           query = query.eq("id", chapterId);
         } else {
@@ -526,14 +539,17 @@ export default function UniversalChapterView({ studentContext }) {
             : (isSpace ? "https://pub-670b98370fe642a2be08ee37cbfd385f.r2.dev/courses/class-6th/science/space-and-solar-system/front_visuals/Space_Solar_System_3D.html" : null);
 
           setChapterData({
+            id: data.id,
+            chapter_slug: data.chapter_slug || chapterId,
             isLightAndShadows: isLight,
             title: data.title || defaultTitle,
-            subject: data.subject_name || "Science",
+            subject: data.subjects?.name || data.title || "Science",
             description: (data.description && data.description.trim()) ? data.description : defaultDesc,
             front_visuals_url: data.front_visuals_url || data.scene_3d_model_url || data.modality_urls?.front_visuals || defaultVisual,
             experience_url: data.experience_url || (isLight ? "Chapter_experience_L_S.html" : null),
             experiments_url: data.experiments_url || null,
             quiz_url: data.quiz_url || null,
+            quiz_ready: data.quiz_ready || Boolean(data.quiz_url),
             mixed_reality_url: data.mixed_reality_url || null,
             stories_url: data.stories_url || null,
             stories: data.custom_modalities?.stories || (isLight ? DEFAULT_LIGHT_SHADOWS_DATA.stories : []),
@@ -570,7 +586,7 @@ export default function UniversalChapterView({ studentContext }) {
         if (chapterId) {
           recordRecentChapter(chapterId, {
             title: data?.title || (isSpace ? "SPACE & SOLAR SYSTEM" : (isLight ? "LIGHT & SHADOWS" : chapterId)),
-            subject: data?.subject_name || "Science"
+            subject: data?.subjects?.name || data?.title || "Science"
           });
         }
       } catch (err) {
@@ -648,7 +664,6 @@ export default function UniversalChapterView({ studentContext }) {
         </div>
       </section>
       <SmartboardOverlay />
-      <AITutorWidget />
       <ComingSoonModal
         isOpen={comingSoonModal.open}
         featureName={comingSoonModal.feature}

@@ -1,32 +1,18 @@
-const https = require('https');
+/**
+ * DEPRECATED: Legacy teacher setup script.
+ * Teachers are now managed through canonical profiles and class_teachers tables
+ * under strict multi-tenant Row-Level Security (RLS).
+ *
+ * This script is retained as a no-op placeholder to prevent breaking legacy references.
+ */
 require('dotenv').config();
-const token = process.env.SUPABASE_TOKEN;
-const projectRef = 'qmyrxvtbzlbnvzxypnus';
 
-const sql = `
-UPDATE teachers SET email = 'gauravroy476@gmail.com' WHERE name = 'Gaurav';
-`;
+function setupTeachersDb() {
+  console.log('ℹ️ setup-teachers-db is deprecated. Teacher assignments are handled via class_teachers and profiles.');
+}
 
-const postData = JSON.stringify({ query: sql });
+if (require.main === module) {
+  setupTeachersDb();
+}
 
-const options = {
-  hostname: 'api.supabase.com',
-  port: 443,
-  path: `/v1/projects/${projectRef}/database/query`,
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(postData)
-  }
-};
-
-const req = https.request(options, (res) => {
-  let data = '';
-  res.on('data', (chunk) => data += chunk);
-  res.on('end', () => console.log('Response:', data));
-});
-
-req.on('error', (e) => console.error(e));
-req.write(postData);
-req.end();
+module.exports = { setupTeachersDb };

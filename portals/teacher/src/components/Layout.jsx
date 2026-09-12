@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Menu } from 'lucide-react';
 import './Layout.css';
 import Sidebar from './Sidebar';
@@ -8,7 +8,7 @@ import { useTheme } from '../ThemeContext';
 import FullscreenButton from './FullscreenButton';
 
 export default function Layout({ children }) {
-  const { backgroundImage, profileName, schoolName, primaryColor } = useTheme();
+  const { backgroundImage, profileName, schoolName } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const toggleMobileMenu = () => {

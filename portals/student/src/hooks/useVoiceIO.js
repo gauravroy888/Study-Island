@@ -41,7 +41,9 @@ export default function useVoiceIO() {
   const [audioLevels, setAudioLevels] = useState([4, 4, 4, 4, 4]);
 
   const isMutedRef            = useRef(isMuted);
-  isMutedRef.current          = isMuted;
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
 
   const mediaRecorderRef      = useRef(null);
   const audioChunksRef        = useRef([]);
@@ -64,7 +66,7 @@ export default function useVoiceIO() {
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {
       const next = !prev;
-      try { localStorage.setItem("aria_muted", String(next)); } catch {}
+      try { localStorage.setItem("aria_muted", String(next)); } catch { /* ignore storage error */ }
       if (next && isTTSSupported) window.speechSynthesis?.cancel();
       return next;
     });
@@ -80,7 +82,7 @@ export default function useVoiceIO() {
       micStreamRef.current = null;
     }
     if (audioCtxRef.current) {
-      try { audioCtxRef.current.close(); } catch {}
+      try { audioCtxRef.current.close(); } catch { /* ignore audioCtx error */ }
       audioCtxRef.current = null;
     }
     setAudioLevels([4, 4, 4, 4, 4]);
@@ -104,7 +106,7 @@ export default function useVoiceIO() {
     }
     listeningRef.current = false;
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      try { mediaRecorderRef.current.stop(); } catch {}
+      try { mediaRecorderRef.current.stop(); } catch { /* ignore recorder stop */ }
     }
     setIsListening(false);
     stopAudioAnalyser();
@@ -118,7 +120,7 @@ export default function useVoiceIO() {
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       if (maxRecordTimerRef.current) clearTimeout(maxRecordTimerRef.current);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-        try { mediaRecorderRef.current.stop(); } catch {}
+        try { mediaRecorderRef.current.stop(); } catch { /* ignore recorder stop */ }
       }
       if (isTTSSupported) window.speechSynthesis?.cancel();
       stopAudioAnalyser();
@@ -291,7 +293,7 @@ export default function useVoiceIO() {
           if (consecutiveSilenceCount > 30 && !silenceTimerRef.current) {
             silenceTimerRef.current = setTimeout(() => {
               if (listeningRef.current && mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-                try { mediaRecorderRef.current.stop(); } catch {}
+                try { mediaRecorderRef.current.stop(); } catch { /* ignore recorder stop */ }
               }
             }, 100);
           }
@@ -305,7 +307,7 @@ export default function useVoiceIO() {
       // Safeguard: auto-stop after 15s
       maxRecordTimerRef.current = setTimeout(() => {
         if (listeningRef.current && mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-          try { mediaRecorderRef.current.stop(); } catch {}
+          try { mediaRecorderRef.current.stop(); } catch { /* ignore recorder stop */ }
         }
       }, 15000);
 

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Calendar, CheckSquare, MessageSquare, Users, BarChart2, Video, Database, Settings as SettingsIcon, Bell, Camera, Tv, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Calendar, CheckSquare, MessageSquare, Users, BarChart2, Video, Database, Settings as SettingsIcon, Bell, Camera, Tv } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import { useUnreadNotifications } from '../hooks/useUnreadNotifications';

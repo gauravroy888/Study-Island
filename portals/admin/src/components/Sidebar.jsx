@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Clock, Users, BookOpen, MessageSquare, BarChart2, Settings as SettingsIcon, Bell, Camera, Edit2 } from 'lucide-react';
+import { LayoutDashboard, Calendar, Clock, Users, BookOpen, MessageSquare, BarChart2, Settings as SettingsIcon, Bell, Camera } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 import ProfilePhotoModal from './ProfilePhotoModal';
 import './Sidebar.css';

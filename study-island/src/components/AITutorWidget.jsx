@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import "./AITutorWidget.css";
 import AITutorDrawer from "./AITutorDrawer";
 
@@ -22,10 +22,21 @@ export default function AITutorWidget() {
   const [isHovered,      setIsHovered     ] = useState(false);
   const [hasNewMessage,  setHasNewMessage ] = useState(false);
 
-  // Pick the right SVG: hover preview when not open, else state-based
-  const currentSvg = (isHovered && !isOpen)
-    ? botHover
-    : (SVG_BY_STATE[botState] ?? botIdle);
+  const isIframe = typeof window !== "undefined" && window.self !== window.top;
+
+  useEffect(() => {
+    if (isIframe) return;
+
+    if (typeof window !== "undefined") {
+      window.__aria_widget_active__ = true;
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.__aria_widget_active__ = false;
+      }
+    };
+  }, [isIframe]);
 
   const handleToggle = useCallback(() => {
     setIsOpen(prev => {
@@ -34,6 +45,15 @@ export default function AITutorWidget() {
     });
     setHasNewMessage(false);
   }, []);
+
+  // Pick the right SVG: hover preview when not open, else state-based
+  const currentSvg = (isHovered && !isOpen)
+    ? botHover
+    : (SVG_BY_STATE[botState] ?? botIdle);
+
+  if (isIframe) {
+    return null;
+  }
 
   return (
     <>

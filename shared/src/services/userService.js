@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase.js';
 
+const SAFE_PROFILE_FIELDS = 'id, auth_id, email, name, role, avatar_url, department, age, timetable, is_archived';
+
 export const userService = {
   async getCurrentProfile() {
     const session = (await supabase.auth.getSession())?.data?.session;
@@ -7,7 +9,7 @@ export const userService = {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select(SAFE_PROFILE_FIELDS)
       .eq('id', session.user.id)
       .single();
     if (error) throw error;
@@ -17,7 +19,7 @@ export const userService = {
   async getTeachers() {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select(SAFE_PROFILE_FIELDS)
       .eq('role', 'teacher');
     if (error) throw error;
     return data || [];
@@ -28,7 +30,7 @@ export const userService = {
       .from('profiles')
       .update(updates)
       .eq('id', userId)
-      .select()
+      .select(SAFE_PROFILE_FIELDS)
       .single();
     if (error) throw error;
     return data;

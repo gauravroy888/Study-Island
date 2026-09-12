@@ -10,7 +10,7 @@ export function useUnreadNotifications() {
     if (userStr) {
       try {
         currentUser = JSON.parse(userStr);
-      } catch (e) {
+      } catch {
         return;
       }
     }

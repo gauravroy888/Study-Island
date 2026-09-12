@@ -1,5 +1,6 @@
 import React from 'react';
 import { SUPABASE_CONFIG } from '../constants.js';
+import { supabase } from '../supabase.js';
 
 export function SuperAdminProfilePhotoModal({ currentUser, setCurrentUser, onClose }) {
       const [activeTab, setActiveTab] = React.useState('avatar');
@@ -25,8 +26,8 @@ export function SuperAdminProfilePhotoModal({ currentUser, setCurrentUser, onClo
       const canvasRef = React.useRef(null);
       const imgRef = React.useRef(null);
 
-      const adminName = currentUser?.name || CURRENT_SUPER_ADMIN.name || 'SuperAdmin';
-      const adminEmail = currentUser?.email || CURRENT_SUPER_ADMIN.email || 'urvashinath0409@gmail.com';
+      const adminName = currentUser?.name || 'SuperAdmin';
+      const adminEmail = currentUser?.email || '';
 
       // Safe DiceBear URL generator adhering strictly to 7.x Avataaars schema
       const expressionParams = expression === 'happy' ? '&mouth=smile,default&eyes=happy,default' : 
@@ -39,7 +40,7 @@ export function SuperAdminProfilePhotoModal({ currentUser, setCurrentUser, onClo
 
       const previewAvatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(adminName)}&top=${hair}&hairColor=${hairColor}&skinColor=${skinColor}&clothing=${clothing}${clothingColorParam}${gender === 'male' && facialHair ? `&facialHair=${facialHair}&facialHairColor=${facialHairColor}` : ''}${genderParams}${accessoriesParams}${expressionParams}&backgroundColor=${avatarBgColor}`;
 
-      const drawCanvas = () => {
+      const drawCanvas = React.useCallback(() => {
         if (!canvasRef.current || !imgRef.current) return;
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
@@ -74,7 +75,7 @@ export function SuperAdminProfilePhotoModal({ currentUser, setCurrentUser, onClo
         ctx.strokeStyle = '#00F0FF';
         ctx.lineWidth = 3;
         ctx.stroke();
-      };
+      }, [zoom, pan]);
 
       React.useEffect(() => {
         if (!imageSrc) {
@@ -91,7 +92,7 @@ export function SuperAdminProfilePhotoModal({ currentUser, setCurrentUser, onClo
         } else {
           drawCanvas();
         }
-      }, [imageSrc, zoom, pan]);
+      }, [imageSrc, drawCanvas]);
 
       const handleFileChange = (e) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -120,17 +121,30 @@ export function SuperAdminProfilePhotoModal({ currentUser, setCurrentUser, onClo
         setIsSaving(true);
         setUploadStep('Syncing avatar with database...');
         try {
-          // Persist to Supabase profiles
-          await fetch(`${SUPABASE_CONFIG.url}/rest/v1/profiles?email=eq.${encodeURIComponent(adminEmail)}`, {
-            method: 'PATCH',
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          if (!token) {
+            throw new Error('No authenticated session found. Please re-login.');
+          }
+
+          // Persist avatar via secure backend endpoint with session token & immutable profile ID
+          const backendRes = await fetch('/api/superadmin/users/avatar', {
+            method: 'POST',
             headers: {
-              'apikey': SUPABASE_CONFIG.key,
-              'Authorization': `Bearer ${SUPABASE_CONFIG.key}`,
               'Content-Type': 'application/json',
-              'Prefer': 'return=minimal'
+              'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ avatar_url: previewAvatarUrl })
+            body: JSON.stringify({
+              id: currentUser.id || currentUser.uid,
+              email: adminEmail,
+              avatar_url: previewAvatarUrl
+            })
           });
+
+          const backendData = await backendRes.json().catch(() => null);
+          if (!backendRes.ok || !backendData?.ok) {
+            throw new Error(backendData?.error || 'Failed to save avatar on server');
+          }
 
           // Update local storage across all portal keys
           const updatedUser = { ...(currentUser || {}), avatar_url: previewAvatarUrl, avatar: previewAvatarUrl };
@@ -145,7 +159,7 @@ export function SuperAdminProfilePhotoModal({ currentUser, setCurrentUser, onClo
               const bc = new BroadcastChannel('edtech_platform_sync');
               bc.postMessage({ type: 'AVATAR_UPDATE', avatar_url: previewAvatarUrl, name: adminName });
               bc.close();
-            } catch (bcErr) {}
+            } catch {}
           }
 
           window.dispatchEvent(new Event('storage'));
@@ -204,13 +218,22 @@ export function SuperAdminProfilePhotoModal({ currentUser, setCurrentUser, onClo
 
           setUploadStep('☁️ Uploading 1000x1000 JPG to Cloudflare R2...');
 
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          if (!token) {
+            throw new Error('Authentication required: no active session found.');
+          }
+
           let finalUrl = null;
 
-          // 2. Upload to Cloudflare R2 via /api/upload-r2
+          // 2. Upload to Cloudflare R2 via /api/upload-r2 with user's session JWT
           try {
             const res = await fetch('/api/upload-r2', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
               body: JSON.stringify({
                 category: 'avatars',
                 isAvatar: true,
@@ -229,25 +252,34 @@ export function SuperAdminProfilePhotoModal({ currentUser, setCurrentUser, onClo
             console.warn('R2 local endpoint error, falling back to Supabase storage:', r2Err);
           }
 
-          // 3. Fallback to Supabase Storage if R2 direct endpoint is unreachable
+          // 3. Fallback to Supabase Storage using supabase client or user session token
           if (!finalUrl) {
             try {
               const resBlob = await fetch(dataUrl);
               const blob = await resBlob.blob();
               const fileName = `avatar-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
 
-              const upRes = await fetch(`${SUPABASE_CONFIG.url}/storage/v1/object/avatars/${fileName}`, {
-                method: 'POST',
-                headers: {
-                  'apikey': SUPABASE_CONFIG.key,
-                  'Authorization': `Bearer ${SUPABASE_CONFIG.key}`,
-                  'Content-Type': 'image/jpeg'
-                },
-                body: blob
-              });
+              const { data: uploadData, error: uploadErr } = await supabase.storage
+                .from('avatars')
+                .upload(fileName, blob, { contentType: 'image/jpeg' });
 
-              if (upRes.ok) {
-                finalUrl = `${SUPABASE_CONFIG.url}/storage/v1/object/public/avatars/${fileName}`;
+              if (!uploadErr && uploadData) {
+                const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+                finalUrl = publicUrl;
+              } else {
+                const upRes = await fetch(`${SUPABASE_CONFIG.url}/storage/v1/object/avatars/${fileName}`, {
+                  method: 'POST',
+                  headers: {
+                    'apikey': SUPABASE_CONFIG.key,
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'image/jpeg'
+                  },
+                  body: blob
+                });
+
+                if (upRes.ok) {
+                  finalUrl = `${SUPABASE_CONFIG.url}/storage/v1/object/public/avatars/${fileName}`;
+                }
               }
             } catch(sbErr) {
               console.warn('Supabase storage fallback error:', sbErr);
@@ -258,19 +290,26 @@ export function SuperAdminProfilePhotoModal({ currentUser, setCurrentUser, onClo
             finalUrl = dataUrl;
           }
 
-          setUploadStep('🟢 Syncing Supabase Profile database...');
+          setUploadStep('🟢 Syncing Supabase Profile database via secure backend...');
 
-          // 4. Persist to Supabase profiles table
-          await fetch(`${SUPABASE_CONFIG.url}/rest/v1/profiles?email=eq.${encodeURIComponent(adminEmail)}`, {
-            method: 'PATCH',
+          // 4. Persist to Supabase profiles table via secure backend endpoint
+          const backendRes = await fetch('/api/superadmin/users/avatar', {
+            method: 'POST',
             headers: {
-              'apikey': SUPABASE_CONFIG.key,
-              'Authorization': `Bearer ${SUPABASE_CONFIG.key}`,
               'Content-Type': 'application/json',
-              'Prefer': 'return=minimal'
+              'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ avatar_url: finalUrl })
+            body: JSON.stringify({
+              id: currentUser.id || currentUser.uid,
+              email: adminEmail,
+              avatar_url: finalUrl
+            })
           });
+
+          const backendData = await backendRes.json().catch(() => null);
+          if (!backendRes.ok || !backendData?.ok) {
+            throw new Error(backendData?.error || 'Failed to save avatar photo on server');
+          }
 
           // 5. Update local storage across all portals
           const updatedUser = { ...(currentUser || {}), avatar_url: finalUrl, avatar: finalUrl };
@@ -286,7 +325,7 @@ export function SuperAdminProfilePhotoModal({ currentUser, setCurrentUser, onClo
               const bc = new BroadcastChannel('edtech_platform_sync');
               bc.postMessage({ type: 'AVATAR_UPDATE', avatar_url: finalUrl, name: adminName });
               bc.close();
-            } catch (bcErr) {}
+            } catch {}
           }
 
           window.dispatchEvent(new Event('storage'));
@@ -301,6 +340,18 @@ export function SuperAdminProfilePhotoModal({ currentUser, setCurrentUser, onClo
       };
 
       const selectClass = "w-full bg-slate-900 border border-cyan-500/30 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none";
+
+      if (!currentUser) {
+        return (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+            <div className="glass-panel p-6 rounded-2xl max-w-sm text-center border border-red-500/40">
+              <h3 className="text-base font-bold text-white mb-2">Access Denied</h3>
+              <p className="text-xs text-slate-400 mb-4">Authentication required to modify administrator profile photo.</p>
+              <button onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-800 text-white text-xs font-bold">Close</button>
+            </div>
+          </div>
+        );
+      }
 
       return (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50">

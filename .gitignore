@@ -25,3 +25,6 @@ chrome-*
 .tempmediaStorage/
 scratch/
 scratch_test_audio.js
+
+# Project Archives
+_archive/

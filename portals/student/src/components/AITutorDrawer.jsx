@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import useGeminiChat    from "../hooks/useGeminiChat";
 import useVoiceIO       from "../hooks/useVoiceIO";
 import useScreenCapture from "../hooks/useScreenCapture";
@@ -55,19 +55,17 @@ export default function AITutorDrawer({ isOpen, onClose, botState, setBotState, 
     else                 setBotState("idle");
   }, [isListening, isLoading, isSpeaking, setBotState]);
 
-  const voiceAudioResult = useCallback(async (audioPayload) => {
+  const voiceAudioResult = useCallback(async function handleVoiceResult(audioPayload) {
     if (!audioPayload || !audioPayload.data || isLoading) return;
     setInput("");
     onNewMessage?.();
     const reply = await sendMessage("", null, audioPayload);
-    if (reply) speak(reply, voiceModeRef.current ? afterSpeak : undefined);
-  }, [isLoading, sendMessage, speak, onNewMessage]);
-
-  /* After speaking in voice mode, auto-listen again */
-  const afterSpeak = useCallback(() => {
-    if (!voiceModeRef.current) return;
-    setTimeout(() => { if (voiceModeRef.current) startListening(voiceAudioResult); }, 400);
-  }, [startListening, voiceAudioResult]);
+    if (reply) {
+      speak(reply, voiceModeRef.current ? () => {
+        setTimeout(() => { if (voiceModeRef.current) startListening(handleVoiceResult); }, 400);
+      } : undefined);
+    }
+  }, [isLoading, sendMessage, speak, onNewMessage, startListening]);
 
   const handleSend = useCallback(async (textOverride) => {
     const text = (textOverride ?? input).trim();
@@ -75,8 +73,12 @@ export default function AITutorDrawer({ isOpen, onClose, botState, setBotState, 
     setInput("");
     onNewMessage?.();
     const reply = await sendMessage(text, null); // screenCapture auto-handles the frame
-    if (reply) speak(reply, voiceModeRef.current ? afterSpeak : undefined);
-  }, [input, isLoading, sendMessage, speak, afterSpeak, onNewMessage]);
+    if (reply) {
+      speak(reply, voiceModeRef.current ? () => {
+        setTimeout(() => { if (voiceModeRef.current) startListening(voiceAudioResult); }, 400);
+      } : undefined);
+    }
+  }, [input, isLoading, sendMessage, speak, onNewMessage, startListening, voiceAudioResult]);
 
   useEffect(() => { sendRef.current = handleSend; }, [handleSend]);
 

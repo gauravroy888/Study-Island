@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, Video, BookOpen, Sparkles, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Clock, MapPin, Video, BookOpen, Sparkles } from 'lucide-react';
 import Card from '../components/Card';
 import { supabase } from '../supabase';
 import { usePresence } from '../hooks/usePresence';
@@ -8,21 +8,13 @@ import './Timetable.css';
 export default function Timetable() {
   const { lastMessage } = usePresence();
   const [selectedDay, setSelectedDay] = useState('Monday');
-  const [liveSessions, setLiveSessions] = useState([]);
   const [dbTimetable, setDbTimetable] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [liveSyncBanner, setLiveSyncBanner] = useState('');
 
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-  const fetchActiveClasses = async () => {
-    setLoading(true);
+  const fetchActiveClasses = useCallback(async () => {
     try {
-      // 1. Fetch live video sessions
-      const { data: liveData } = await supabase.from('live_classes').select('*').eq('status', 'active');
-      if (liveData) setLiveSessions(liveData);
-
-      // 2. Fetch timetables for Class 6th
       const { data: ttData } = await supabase
         .from('timetables')
         .select('*')
@@ -33,23 +25,34 @@ export default function Timetable() {
       }
     } catch (e) {
       console.error(e);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchActiveClasses();
-  }, []);
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await fetchActiveClasses();
+    };
+    void init();
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchActiveClasses]);
 
   // Listen to WebSocket broadcasts
   useEffect(() => {
     if (lastMessage?.type === 'timetable_update') {
-      fetchActiveClasses();
-      setLiveSyncBanner('⚡ Timetable updated in real time by Admin!');
-      setTimeout(() => setLiveSyncBanner(''), 4000);
+      const bannerTimer = setTimeout(() => {
+        void fetchActiveClasses();
+        setLiveSyncBanner('⚡ Timetable updated in real time by Admin!');
+      }, 0);
+      const clearTimer = setTimeout(() => setLiveSyncBanner(''), 4000);
+      return () => {
+        clearTimeout(bannerTimer);
+        clearTimeout(clearTimer);
+      };
     }
-  }, [lastMessage]);
+  }, [lastMessage, fetchActiveClasses]);
 
   // Compute active schedule for selected day
   const getScheduleForSelectedDay = () => {

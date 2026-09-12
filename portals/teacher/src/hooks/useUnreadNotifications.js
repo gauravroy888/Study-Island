@@ -12,12 +12,13 @@ export function useUnreadNotifications() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
+    let isMounted = true;
     let currentUser = null;
     const userStr = localStorage.getItem('edtech_user');
     if (userStr) {
       try {
         currentUser = JSON.parse(userStr);
-      } catch (e) {
+      } catch {
         return;
       }
     }
@@ -38,25 +39,35 @@ export function useUnreadNotifications() {
       const readSet = getReadAnnouncements();
       const unreadAnnounceCount = (announceData || []).filter(a => !readSet.has(`announce_${a.id}`)).length;
 
-      setUnreadCount((count || 0) + unreadAnnounceCount);
+      if (isMounted) {
+        setUnreadCount((count || 0) + unreadAnnounceCount);
+      }
     };
 
-    fetchUnreadCount();
+    const init = async () => {
+      if (isMounted) await fetchUnreadCount();
+    };
+    void init();
 
     const subscription = supabase.channel('public:notifications:unread')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'notifications'
-      }, fetchUnreadCount)
+      }, () => {
+        if (isMounted) fetchUnreadCount();
+      })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'announcements'
-      }, fetchUnreadCount)
+      }, () => {
+        if (isMounted) fetchUnreadCount();
+      })
       .subscribe();
 
     return () => {
+      isMounted = false;
       supabase.removeChannel(subscription);
     };
   }, []);

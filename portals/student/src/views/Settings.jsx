@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { User, Bell, Lock, Palette } from 'lucide-react';
+import { useState } from 'react';
+import { User, Lock } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 import ProfilePhotoModal from '../components/ProfilePhotoModal';
 import { supabase } from '../supabase';
@@ -10,12 +10,12 @@ export default function Settings() {
   const getAuthUser = () => {
     try {
       return JSON.parse(localStorage.getItem('edtech_user') || 'null');
-    } catch(e) { return null; }
+    } catch { return null; }
   };
   const authUser = getAuthUser();
 
   const [name, setName] = useState(authUser?.name || profileName || 'Alex');
-  const [email, setEmail] = useState(authUser?.email || 'alex@student.edtech.org');
+  const email = authUser?.email || 'alex@student.edtech.org';
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 

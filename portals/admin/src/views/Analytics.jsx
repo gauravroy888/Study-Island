@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { BarChart2, TrendingUp, Users, CheckCircle, Award, Calendar, ArrowUpRight, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { ArrowUpRight, Loader2 } from 'lucide-react';
 import Card from '../components/Card';
 import { supabase } from '../supabase';
 
@@ -18,6 +18,7 @@ export default function Analytics() {
   const [subjectData, setSubjectData] = useState([]);
 
   useEffect(() => {
+    let isMounted = true;
     async function loadAnalytics() {
       setLoading(true);
       try {
@@ -48,6 +49,8 @@ export default function Analytics() {
         const { count: courseCount } = await supabase
           .from('courses')
           .select('*', { count: 'exact', head: true });
+
+        if (!isMounted) return;
 
         setCounts({
           students: studentCount || 0,
@@ -84,10 +87,13 @@ export default function Analytics() {
       } catch (e) {
         console.error('Error fetching analytics:', e);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
-    loadAnalytics();
+    void loadAnalytics();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const attendanceTrend = [

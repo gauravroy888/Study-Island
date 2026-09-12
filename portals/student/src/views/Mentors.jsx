@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Star, MessageCircle, X, Mail, BookOpen, Clock, MapPin, Award, CheckCircle2, Sparkles, UserCheck } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, Star, MessageCircle, X, Mail, BookOpen, Clock, MapPin } from 'lucide-react';
 import Card from '../components/Card';
 import { supabase } from '../supabase';
 import { useNavigate } from 'react-router-dom';
@@ -17,27 +17,7 @@ export default function Mentors() {
   // Presence comes from PresenceProvider — no own channel needed
   const { isOnline } = usePresence();
 
-  useEffect(() => {
-    fetchTeachers();
-
-    const tChannel = supabase
-      .channel('public:teachers_sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'teachers' }, fetchTeachers)
-      .subscribe();
-
-    const uChannel = supabase
-      .channel('public:users_sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchTeachers)
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(tChannel);
-      supabase.removeChannel(uChannel);
-    };
-  }, []);
-
-
-  const fetchTeachers = async () => {
+  const fetchTeachers = useCallback(async () => {
     setIsLoading(true);
     try {
       // 1. Query 'teachers' table
@@ -105,7 +85,35 @@ export default function Mentors() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await fetchTeachers();
+    };
+    void init();
+
+    const tChannel = supabase
+      .channel('public:teachers_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'teachers' }, () => {
+        if (isMounted) fetchTeachers();
+      })
+      .subscribe();
+
+    const uChannel = supabase
+      .channel('public:users_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        if (isMounted) fetchTeachers();
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(tChannel);
+      supabase.removeChannel(uChannel);
+    };
+  }, [fetchTeachers]);
 
   const openDirectChat = (teacher) => {
     const targetEmail = teacher.email || 'gauravroy476@gmail.com';

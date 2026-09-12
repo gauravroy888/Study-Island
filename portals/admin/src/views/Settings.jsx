@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Settings as SettingsIcon, Shield, Bell, Palette, School, Save, Check, Key, Lock, Image as ImageIcon, User, Upload, RefreshCw, Sparkles, CheckCircle2 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Palette, School, Save, Check, Image as ImageIcon, User, Upload, RefreshCw, CheckCircle2 } from 'lucide-react';
 import Card from '../components/Card';
 import { useTheme, THEME_PRESETS } from '../ThemeContext';
 import ProfilePhotoModal from '../components/ProfilePhotoModal';
@@ -14,8 +14,7 @@ export default function Settings() {
     branding, 
     updateBranding, 
     backgroundImage, setBackgroundImage, 
-    profileName, setProfileName, 
-    profileDesignation, setProfileDesignation, 
+    profileName,
     profileImage 
   } = useTheme();
 
@@ -29,8 +28,6 @@ export default function Settings() {
   const [accentGlow, setAccentGlow] = useState(branding.accent_glow || 'var(--brand-glow, rgba(0, 240, 255, 0.4))');
   const [themePreset, setThemePreset] = useState(branding.theme_preset || 'cyber_stem');
 
-  const [twoFactorAuth, setTwoFactorAuth] = useState(true);
-  const [sessionTimeout, setSessionTimeout] = useState('30');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
@@ -38,17 +35,17 @@ export default function Settings() {
   const logoInputRef = useRef(null);
 
   // Sync internal state when external branding updates
-  useEffect(() => {
-    if (branding) {
-      if (branding.school_name) setSchoolName(branding.school_name);
-      if (branding.school_tagline) setSchoolTagline(branding.school_tagline);
-      if (branding.logo_url) setLogoUrl(branding.logo_url);
-      if (branding.primary_color) setPrimaryColor(branding.primary_color);
-      if (branding.secondary_color) setSecondaryColor(branding.secondary_color);
-      if (branding.accent_glow) setAccentGlow(branding.accent_glow);
-      if (branding.theme_preset) setThemePreset(branding.theme_preset);
-    }
-  }, [branding]);
+  const [prevBranding, setPrevBranding] = useState(branding);
+  if (branding !== prevBranding) {
+    setPrevBranding(branding);
+    if (branding?.school_name) setSchoolName(branding.school_name);
+    if (branding?.school_tagline) setSchoolTagline(branding.school_tagline);
+    if (branding?.logo_url) setLogoUrl(branding.logo_url);
+    if (branding?.primary_color) setPrimaryColor(branding.primary_color);
+    if (branding?.secondary_color) setSecondaryColor(branding.secondary_color);
+    if (branding?.accent_glow) setAccentGlow(branding.accent_glow);
+    if (branding?.theme_preset) setThemePreset(branding.theme_preset);
+  }
 
   const WALLPAPERS = [
     { id: 'future', name: 'Future Version Cyber Glass', path: futureBg, label: 'Future Cyber Glass' },
@@ -114,7 +111,9 @@ export default function Settings() {
           const compressed = canvas.toDataURL('image/png', 0.92);
           setLogoUrl(compressed);
           updateBranding({ logo_url: compressed });
-        } catch (err) {}
+        } catch {
+          // Canvas compression fallback
+        }
         setIsUploadingLogo(false);
       };
       img.onerror = () => {
@@ -130,8 +129,31 @@ export default function Settings() {
   const handleSaveSettings = async (e) => {
     if (e) e.preventDefault();
 
+    // Resolve institution_id from the authenticated admin's profile (authoritative source).
+    // Never fall back to a hardcoded tenant string.
+    let institution_id = null;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('institution_id')
+          .eq('id', user.id)
+          .single();
+        institution_id = profile?.institution_id ?? null;
+      }
+    } catch {
+      // Swallow auth read errors; institution_id remains null.
+    }
+
+    if (!institution_id) {
+      console.error('[Settings] Cannot save branding: no institution_id on admin profile.');
+      setSavedSuccess(false);
+      return;
+    }
+
     const brandPayload = {
-      institution_id: 'inst-dps-001',
+      institution_id,
       school_name: schoolName.trim(),
       school_tagline: schoolTagline.trim(),
       logo_url: logoUrl,
@@ -168,7 +190,9 @@ export default function Settings() {
           timestamp: Date.now()
         });
         bc.close();
-      } catch (bcErr) {}
+      } catch {
+        // BroadcastChannel fallback
+      }
     }
 
     setSavedSuccess(true);

@@ -1,32 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Megaphone, MessageSquare, PlusCircle, CheckCircle, Send, Trash2, Calendar, Radio } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Megaphone, MessageSquare, PlusCircle, CheckCircle, Send, Trash2, Radio } from 'lucide-react';
 import { supabase } from '../supabase';
 import ChatInterface from '../components/ChatInterface';
 import './Communications.css';
 
 export default function Communications() {
   const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'announcements'
-  const [currentUser, setCurrentUser] = useState(null);
-  const [unreadCounts, setUnreadCounts] = useState({ chat: 0 });
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const userParam = params.get('user');
-    if (userParam) {
-      localStorage.setItem('edtech_user', userParam);
-      setCurrentUser(JSON.parse(userParam));
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else {
+  const [currentUser] = useState(() => {
+    try {
       const userStr = localStorage.getItem('edtech_user');
-      if (userStr) {
-        try {
-          setCurrentUser(JSON.parse(userStr));
-        } catch (e) {
-          console.error(e);
-        }
-      }
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (e) {
+      console.error(e);
+      return null;
     }
-  }, []);
+  });
+  const [unreadCounts, setUnreadCounts] = useState({ chat: 0 });
 
   // Announcement state
   const [announcements, setAnnouncements] = useState([]);
@@ -46,13 +35,22 @@ export default function Communications() {
   };
 
   useEffect(() => {
-    fetchAnnouncements();
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await fetchAnnouncements();
+    };
+    void init();
 
     const subscription = supabase.channel('announcements_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, fetchAnnouncements)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        if (isMounted) void fetchAnnouncements();
+      })
       .subscribe();
 
-    return () => { supabase.removeChannel(subscription); };
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   const handlePostAnnouncement = async (e) => {

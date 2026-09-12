@@ -119,3 +119,353 @@
   width: 40px;
   text-align: right;
 }
+
+/* --- Aria AI Personal Coach Card --- */
+.aria-coach-card {
+  position: relative;
+  border-radius: 20px;
+  padding: 24px 28px;
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.aria-coach-card.application_gap {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(13, 20, 36, 0.85) 60%, rgba(244, 63, 94, 0.06) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 8px 32px rgba(245, 158, 11, 0.12);
+}
+
+.aria-coach-card.mastery_established {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, rgba(13, 20, 36, 0.85) 60%, rgba(0, 240, 255, 0.08) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 8px 32px rgba(16, 185, 129, 0.15);
+}
+
+.aria-coach-card.normal {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.08) 0%, rgba(13, 20, 36, 0.85) 60%, rgba(59, 130, 246, 0.08) 100%);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 240, 255, 0.1);
+}
+
+.aria-coach-avatar-wrap {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.aria-coach-avatar-wrap.application_gap {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+}
+
+.aria-coach-avatar-wrap.mastery_established {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #10b981;
+}
+
+.aria-coach-avatar-wrap.normal {
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  color: #00F0FF;
+}
+
+.aria-pulse-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #10B981;
+  border: 2px solid #060913;
+  box-shadow: 0 0 8px #10B981;
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.7; }
+}
+
+.aria-coach-content {
+  flex: 1;
+}
+
+.aria-coach-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.aria-coach-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  text-transform: uppercase;
+}
+
+.aria-coach-badge.application_gap {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+}
+
+.aria-coach-badge.mastery_established {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.5);
+}
+
+.aria-coach-badge.normal {
+  background: rgba(0, 240, 255, 0.15);
+  color: #00F0FF;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+}
+
+.aria-coach-quote {
+  color: #f1f5f9;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0 0 16px 0;
+  font-weight: 500;
+}
+
+.aria-coach-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.aria-action-btn {
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  transition: all 0.2s;
+  border: none;
+}
+
+.aria-action-btn.primary {
+  background: linear-gradient(135deg, var(--brand-primary, #00F0FF), var(--brand-secondary, #3B82F6));
+  color: #040814;
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.35);
+}
+
+.aria-action-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.55);
+}
+
+.aria-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.aria-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(0, 240, 255, 0.3);
+}
+
+/* --- 7 STEM Dimensions Grid & Cards --- */
+.dimensions-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.dimensions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.dimension-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+.dimension-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(0, 240, 255, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.dimension-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.dimension-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dimension-icon {
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.dimension-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.dimension-family-tag {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.confidence-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.confidence-badge.high {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.confidence-badge.medium {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+.confidence-badge.low {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+}
+
+.dimension-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.dimension-score {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.trend-indicator {
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.trend-indicator.improving {
+  color: #10B981;
+}
+
+.trend-indicator.stable {
+  color: #FBBF24;
+}
+
+.trend-indicator.needs_focus {
+  color: #F43F5E;
+}
+
+.dimension-desc {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 10px;
+  line-height: 1.4;
+}
+
+/* --- Bloom Radar Chart & Cards --- */
+.bloom-radar-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bloom-pills-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.bloom-pill {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bloom-pill-level {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.bloom-pill-val {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.bloom-pill-weight {
+  font-size: 0.68rem;
+  color: var(--brand-primary, #00F0FF);
+  font-family: monospace;
+}

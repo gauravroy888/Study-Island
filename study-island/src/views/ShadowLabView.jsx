@@ -1,5 +1,4 @@
-﻿import React from "react";
-import AITutorWidget from "../components/AITutorWidget";
+import React from "react";
 
 export default function ShadowLabView() {
   return (
@@ -10,7 +9,6 @@ export default function ShadowLabView() {
         className="w-full h-full border-0"
         allow="autoplay; fullscreen"
       />
-      <AITutorWidget />
     </div>
   );
 }

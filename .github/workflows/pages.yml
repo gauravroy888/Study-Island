@@ -21,14 +21,41 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies (root and all portals)
+        run: |
+          npm ci
+          npm ci --prefix portals/admin
+          npm ci --prefix portals/student
+          npm ci --prefix portals/teacher
+          npm ci --prefix portals/superadmin
+          npm ci --prefix study-island
+
+      - name: Run automated security and integrity tests
+        run: npm test
+
+      - name: Build all platform portals
+        run: npm run build:all
+
+      - name: Comprehensive Secret Scan of Source and Build Artifacts
+        run: node scripts/scan-secrets.js
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

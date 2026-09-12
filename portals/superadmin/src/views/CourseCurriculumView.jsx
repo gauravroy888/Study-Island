@@ -1,5 +1,5 @@
 import React from 'react';
-import { SUPABASE_URL, SUPABASE_KEY } from '../supabase.js';
+import { supabase, SUPABASE_URL, SUPABASE_KEY } from '../supabase.js';
 
     const DEFAULT_MODALITIES = [
       { slug: 'front_visuals',  label: 'Front Visuals', emoji: '🖼️', icon: 'ph-image',        color: '#EC4899', isMulti: false, renderer: 'iframe_full',  description: 'Hero 3D Scene / Front Animation + Text Description' },
@@ -22,10 +22,43 @@ import { SUPABASE_URL, SUPABASE_KEY } from '../supabase.js';
     ];
 
 export function CourseCurriculumView() {
-      const SUPABASE_URL = 'https://qmyrxvtbzlbnvzxypnus.supabase.co';
-      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFteXJ4dnRiemxibnZ6eHlwbnVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA4OTcsImV4cCI6MjA5NTM5Njg5N30.ABvW_oBzXC2Ffxm5ToLh6t4WmdKPdtg9SyfeAE76iJo';
-      const R2_CDN = 'https://pub-670b98370fe642a2be08ee37cbfd385f.r2.dev';
-      const sb = (path, opts={}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation', ...opts.headers }, ...opts });
+      // SECURITY: Resolve and cache the authenticated user's real JWT access token.
+      // The anon key (SUPABASE_KEY) must ONLY be used as the apikey service header —
+      // never as the Authorization Bearer token, which must be the user's actual session JWT.
+      const _accessTokenRef = React.useRef(null);
+      React.useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          _accessTokenRef.current = session?.access_token ?? null;
+        });
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
+          _accessTokenRef.current = session?.access_token ?? null;
+        });
+        return () => subscription?.unsubscribe();
+      }, []);
+
+      // sb() helper: uses the authenticated user's real JWT as Bearer — never the anon key.
+      const sb = async (path, opts = {}) => {
+        let token = _accessTokenRef.current;
+        if (!token) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          token = sessionData?.session?.access_token;
+          _accessTokenRef.current = token;
+        }
+        if (!token) {
+          // Refuse to make authenticated calls without a real user session.
+          throw new Error('CourseCurriculumView: No authenticated session — Supabase call blocked.');
+        }
+        return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+            ...opts.headers,
+          },
+          ...opts,
+        });
+      };
 
       const [step, setStep] = React.useState('classes'); // 'classes' | 'subjects' | 'chapters' | 'modalities'
       const [classes, setClasses] = React.useState([]);
@@ -33,7 +66,7 @@ export function CourseCurriculumView() {
       const [chapters, setChapters] = React.useState([]);
       const [selectedClass, setSelectedClass] = React.useState(null);
       const [selectedSubject, setSelectedSubject] = React.useState(null);
-      const [selectedChapter, setSelectedChapter] = React.useState(null);
+      const [selectedChapter] = React.useState(null);
       const [loading, setLoading] = React.useState(false);
       const [toast, setToast] = React.useState(null);
       const [showAddClass, setShowAddClass] = React.useState(false);
@@ -42,7 +75,6 @@ export function CourseCurriculumView() {
       const [showAddCustomModal, setShowAddCustomModal] = React.useState(false);
       const [customModalities, setCustomModalities] = React.useState([]);
       const [chapterModalities, setChapterModalities] = React.useState({});
-      const [uploadingSlot, setUploadingSlot] = React.useState(null);
 
       // Improvements state
       const [stats, setStats] = React.useState({ total: 0, published: 0, missingExperience: 0, missingQuiz: 0, empty: 0 });
@@ -69,73 +101,6 @@ export function CourseCurriculumView() {
 
       const showToast = (msg, type='success') => { setToast({ msg, type }); setTimeout(()=>setToast(null),3500); };
 
-      React.useEffect(() => {
-        loadClasses();
-        loadStats();
-      }, []);
-
-      const loadStats = async () => {
-        try {
-          const r = await sb('course_chapters?select=id,title,is_published,experience_ready,quiz_ready,stories_ready,experiments_ready');
-          const d = await r.json();
-          if (Array.isArray(d)) {
-            const total = d.length;
-            const published = d.filter(c => c.is_published).length;
-            const missingExp = d.filter(c => !c.experience_ready).length;
-            const missingQuiz = d.filter(c => !c.quiz_ready).length;
-            const empty = d.filter(c => !c.experience_ready && !c.quiz_ready && !c.stories_ready && !c.experiments_ready).length;
-            setStats({ total, published, missingExperience: missingExp, missingQuiz, empty });
-          }
-        } catch(e) {}
-      };
-
-      const handleGlobalSearch = async (query) => {
-        setSearchQuery(query);
-        if (!query.trim()) { setSearchResults([]); setIsSearching(false); return; }
-        setIsSearching(true);
-        try {
-          const r = await sb(`course_chapters?title=ilike.*${encodeURIComponent(query.trim())}*&select=id,title,class_name,subject_name,is_published,chapter_order`);
-          const d = await r.json();
-          setSearchResults(Array.isArray(d) ? d : []);
-        } catch(e) { setSearchResults([]); }
-        setIsSearching(false);
-      };
-
-      const exportCurriculumJSON = async () => {
-        try {
-          const r = await sb('course_chapters?select=*&order=class_name,subject_name,chapter_order');
-          const d = await r.json();
-          const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `curriculum_backup_${new Date().toISOString().slice(0,10)}.json`;
-          a.click();
-          showToast('✅ Curriculum backup downloaded!');
-        } catch(e) { showToast('Export failed', 'error'); }
-      };
-
-      const bulkAction = async (actionType) => {
-        if (selectedChapterIds.length === 0) return;
-        try {
-          const ids = selectedChapterIds.join(',');
-          if (actionType === 'publish') {
-            await sb(`course_chapters?id=in.(${ids})`, { method: 'PATCH', body: JSON.stringify({ is_published: true }) });
-            showToast(`🚀 Published ${selectedChapterIds.length} chapters!`);
-          } else if (actionType === 'unpublish') {
-            await sb(`course_chapters?id=in.(${ids})`, { method: 'PATCH', body: JSON.stringify({ is_published: false }) });
-            showToast(`📴 Unpublished ${selectedChapterIds.length} chapters!`);
-          } else if (actionType === 'delete') {
-            if (!window.confirm(`Delete ${selectedChapterIds.length} selected chapters?`)) return;
-            await sb(`course_chapters?id=in.(${ids})`, { method: 'DELETE' });
-            showToast(`🗑️ Deleted ${selectedChapterIds.length} chapters!`);
-          }
-          setSelectedChapterIds([]);
-          if (selectedSubject) loadChapters(selectedSubject);
-          loadStats();
-        } catch(e) { showToast('Bulk action failed', 'error'); }
-      };
-
       const calcChapterProgressScore = (ch) => {
         let earned = 0;
         if (ch.experience_url && typeof ch.experience_url === 'string' && ch.experience_url.trim() !== '') earned += 1;
@@ -149,6 +114,21 @@ export function CourseCurriculumView() {
         earned += Math.min(storiesList.length, 4);
 
         return Math.min(100, Math.round((earned / 10) * 100));
+      };
+
+      const loadStats = async () => {
+        try {
+          const r = await sb('course_chapters?select=id,title,is_published,experience_ready,quiz_ready,stories_ready,experiments_ready');
+          const d = await r.json();
+          if (Array.isArray(d)) {
+            const total = d.length;
+            const published = d.filter(c => c.is_published).length;
+            const missingExp = d.filter(c => !c.experience_ready).length;
+            const missingQuiz = d.filter(c => !c.quiz_ready).length;
+            const empty = d.filter(c => !c.experience_ready && !c.quiz_ready && !c.stories_ready && !c.experiments_ready).length;
+            setStats({ total, published, missingExperience: missingExp, missingQuiz, empty });
+          }
+        } catch { /* ignore stats fetch error */ }
       };
 
       const loadClasses = async () => {
@@ -191,8 +171,69 @@ export function CourseCurriculumView() {
           });
 
           setClasses(computedClasses);
-        } catch(e) { setClasses([]); }
+        } catch { setClasses([]); }
         setLoading(false);
+      };
+
+      React.useEffect(() => {
+        let isMounted = true;
+        const init = async () => {
+          if (isMounted) {
+            await loadClasses();
+            await loadStats();
+          }
+        };
+        void init();
+        return () => {
+          isMounted = false;
+        };
+      }, []);
+
+      const handleGlobalSearch = async (query) => {
+        setSearchQuery(query);
+        if (!query.trim()) { setSearchResults([]); setIsSearching(false); return; }
+        setIsSearching(true);
+        try {
+          const r = await sb(`course_chapters?title=ilike.*${encodeURIComponent(query.trim())}*&select=id,title,is_published,chapter_order,subject_id,subjects(id,name,class_id,classes(id,name))`);
+          const d = await r.json();
+          setSearchResults(Array.isArray(d) ? d : []);
+        } catch { setSearchResults([]); }
+        setIsSearching(false);
+      };
+
+      const exportCurriculumJSON = async () => {
+        try {
+          const r = await sb('course_chapters?select=*,subjects(id,name,classes(id,name))&order=chapter_order');
+          const d = await r.json();
+          const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `curriculum_backup_${new Date().toISOString().slice(0,10)}.json`;
+          a.click();
+          showToast('✅ Curriculum backup downloaded!');
+        } catch { showToast('Export failed', 'error'); }
+      };
+
+      const bulkAction = async (actionType) => {
+        if (selectedChapterIds.length === 0) return;
+        try {
+          const ids = selectedChapterIds.join(',');
+          if (actionType === 'publish') {
+            await sb(`course_chapters?id=in.(${ids})`, { method: 'PATCH', body: JSON.stringify({ is_published: true }) });
+            showToast(`🚀 Published ${selectedChapterIds.length} chapters!`);
+          } else if (actionType === 'unpublish') {
+            await sb(`course_chapters?id=in.(${ids})`, { method: 'PATCH', body: JSON.stringify({ is_published: false }) });
+            showToast(`📴 Unpublished ${selectedChapterIds.length} chapters!`);
+          } else if (actionType === 'delete') {
+            if (!window.confirm(`Delete ${selectedChapterIds.length} selected chapters?`)) return;
+            await sb(`course_chapters?id=in.(${ids})`, { method: 'DELETE' });
+            showToast(`🗑️ Deleted ${selectedChapterIds.length} chapters!`);
+          }
+          setSelectedChapterIds([]);
+          if (selectedSubject) loadChapters(selectedSubject);
+          loadStats();
+        } catch { showToast('Bulk action failed', 'error'); }
       };
 
       const loadSubjects = async (cls) => {
@@ -222,7 +263,7 @@ export function CourseCurriculumView() {
           });
 
           setSubjects(computedSubjects);
-        } catch(e) { setSubjects([]); }
+        } catch { setSubjects([]); }
         setLoading(false);
       };
 
@@ -251,7 +292,7 @@ export function CourseCurriculumView() {
             });
           }
           setChapterModalities(mods);
-        } catch(e) { setChapters([]); }
+        } catch { setChapters([]); }
         setLoading(false);
       };
 
@@ -262,7 +303,7 @@ export function CourseCurriculumView() {
           const d = await r.json();
           if (r.ok) { showToast(`✅ ${newClass.name} created!`); setNewClass({ name:'', display_order:1 }); setShowAddClass(false); loadClasses(); }
           else showToast(d.message||'Error creating class', 'error');
-        } catch(e) { showToast('Network error', 'error'); }
+        } catch { showToast('Network error', 'error'); }
       };
 
       const addSubject = async () => {
@@ -272,7 +313,7 @@ export function CourseCurriculumView() {
           const d = await r.json();
           if (r.ok) { showToast(`✅ ${newSubject.name} created!`); setNewSubject({ name:'', icon:'📚', description:'' }); setShowAddSubject(false); loadSubjects(selectedClass); }
           else showToast(d.message||'Error creating subject', 'error');
-        } catch(e) { showToast('Network error', 'error'); }
+        } catch { showToast('Network error', 'error'); }
       };
 
       const addChapter = async () => {
@@ -280,7 +321,7 @@ export function CourseCurriculumView() {
         const slug = newChapter.title.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-');
         try {
           const payload = {
-            subject_id: selectedSubject.id, class_name: selectedClass.name, subject_name: selectedSubject.name,
+            subject_id: selectedSubject.id,
             chapter_order: parseInt(newChapter.chapter_order)||1, chapter_slug: slug,
             title: newChapter.title.trim().toUpperCase(), description: newChapter.description,
             experience_ready: false, experiments_ready: false, quiz_ready: false, mixed_reality_ready: false, stories_ready: false,
@@ -290,7 +331,7 @@ export function CourseCurriculumView() {
           const d = await r.json();
           if (r.ok) { showToast(`✅ Chapter "${newChapter.title.toUpperCase()}" created!`); setNewChapter({ title:'', description:'', chapter_order:1 }); setShowAddChapter(false); loadChapters(selectedSubject); }
           else showToast(d.message||'Error creating chapter', 'error');
-        } catch(e) { showToast('Network error', 'error'); }
+        } catch { showToast('Network error', 'error'); }
       };
 
       const addCustomModality = () => {
@@ -331,7 +372,7 @@ export function CourseCurriculumView() {
             const err = await r.json();
             showToast(err.message || 'Save failed', 'error');
           }
-        } catch(e) { showToast('Network error', 'error'); }
+        } catch { showToast('Network error', 'error'); }
       };
 
       const saveMultiItemList = async (chapter, slug, newList) => {
@@ -353,7 +394,7 @@ export function CourseCurriculumView() {
           } else {
             showToast('Failed to save items', 'error');
           }
-        } catch(e) { showToast('Network error', 'error'); }
+        } catch { showToast('Network error', 'error'); }
       };
 
       const publishChapter = async (chapter) => {
@@ -374,7 +415,7 @@ export function CourseCurriculumView() {
           } else {
             showToast(d.message || 'Delete failed', 'error');
           }
-        } catch(e) {
+        } catch {
           showToast('Network error on delete', 'error');
         }
       };
@@ -386,7 +427,7 @@ export function CourseCurriculumView() {
             const text = await file.text();
             const match = text.match(/https?:\/\/[^\s]+/);
             if (match) return match[0];
-          } catch(e) {}
+          } catch {}
         }
         return URL.createObjectURL(file);
       };
@@ -453,7 +494,7 @@ export function CourseCurriculumView() {
               try {
                 const txt = await file.text();
                 chObj.front_description = txt.trim();
-              } catch(e) {}
+              } catch {}
             } else {
               chObj.front_visuals = file;
             }
@@ -578,7 +619,7 @@ export function CourseCurriculumView() {
                 const itemUrl = await helperUploadFileOrReadUrl(fileItem);
                 const labTitle = fileItem.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ').toUpperCase();
                 expList.push({
-                  id: `exp_${Date.now()}_${expIdx}`,
+                  id: `exp_${expIdx}_${fileItem.name.replace(/[^a-zA-Z0-9]/g, '_')}`,
                   title: labTitle || `Virtual Lab ${expIdx}`,
                   author: 'by Platform',
                   badge: 'Virtual Lab',
@@ -620,7 +661,7 @@ export function CourseCurriculumView() {
                 const itemUrl = await helperUploadFileOrReadUrl(fileItem);
                 const storyTitle = fileItem.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ').toUpperCase();
                 storiesList.push({
-                  id: `story_${Date.now()}_${stIdx}`,
+                  id: `story_${stIdx}_${fileItem.name.replace(/[^a-zA-Z0-9]/g, '_')}`,
                   title: storyTitle || `Video Lesson ${stIdx}`,
                   tag: 'LESSON',
                   duration: '5:00',
@@ -829,7 +870,7 @@ export function CourseCurriculumView() {
               const err = await r.json();
               showToast(err.message || 'Save failed', 'error');
             }
-          } catch(e) {
+          } catch {
             showToast('Network error saving description', 'error');
           } finally {
             setSavingDesc(false);
@@ -847,26 +888,21 @@ export function CourseCurriculumView() {
               const base64Data = e.target.result.split(',')[1];
               setUploadProgress(`Uploading ${file.name} to Cloudflare R2...`);
 
-              let authHeader = `Bearer ${SUPABASE_CONFIG.key}`;
-              try {
-                for (let i = 0; i < localStorage.length; i++) {
-                  const key = localStorage.key(i);
-                  if (key && (key.startsWith('sb-') || key.includes('supabase')) && (key.endsWith('-auth-token') || key.endsWith('token'))) {
-                    try {
-                      const tokenData = JSON.parse(localStorage.getItem(key));
-                      if (tokenData && tokenData.access_token) {
-                        authHeader = `Bearer ${tokenData.access_token}`;
-                        break;
-                      }
-                    } catch(err){}
-                  }
-                }
-              } catch(e) {}
+              let token = _accessTokenRef.current;
+              if (!token) {
+                const { data: sessionData } = await supabase.auth.getSession();
+                token = sessionData?.session?.access_token;
+                _accessTokenRef.current = token;
+              }
+              if (!token) {
+                throw new Error('Authentication required to upload curriculum media. Please log in.');
+              }
+              const authHeader = `Bearer ${token}`;
 
               try {
                 const response = await fetch('/api/upload-r2', {
                   method: 'POST',
-                  headers: { 
+                  headers: {
                     'Content-Type': 'application/json',
                     'Authorization': authHeader
                   },
@@ -917,13 +953,13 @@ export function CourseCurriculumView() {
         const previewFinalUrl = resolvePreviewUrl(saved);
 
         return (
-          <div 
+          <div
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             className={`transition-all relative rounded-xl p-3.5 ${dragOver ? 'border-2 border-cyan-400 bg-cyan-950/40 shadow-lg shadow-cyan-500/20' : ''}`}
             style={{ border: dragOver ? '2px solid #00F0FF' : `1px solid ${mod.color}33`, background: `${mod.color}08` }}>
-            
+
             <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => { if (e.target.files?.[0]) uploadFileToR2(e.target.files[0]); }} />
             <input type="file" ref={folderInputRef} webkitdirectory="true" directory="true" multiple className="hidden" onChange={(e) => { if (e.target.files?.[0]) uploadFileToR2(e.target.files[0]); }} />
 
@@ -938,7 +974,7 @@ export function CourseCurriculumView() {
                   <p className="text-[10px] text-slate-500 mt-0.5">{mod.description}</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-1.5">
                 {saved ? (
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1" style={{background:'#34D39920', color:'#34D399', border:'1px solid #34D39940'}}>
@@ -963,15 +999,15 @@ export function CourseCurriculumView() {
               <div className="space-y-2 mt-2 pt-2 border-t border-slate-700/40">
                 <div className="flex gap-2">
                   <input
-                    type="text" 
+                    type="text"
                     placeholder="Paste Cloudflare R2 CDN URL, video link, or simulation link..."
-                    value={url} 
+                    value={url}
                     onChange={e => setUrl(e.target.value)}
                     className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-600 outline-none font-mono"
                   />
-                  <button 
+                  <button
                     onClick={() => { saveModalityUrl(chapter, mod.slug, url); setEditing(false); }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-white shadow" 
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-white shadow"
                     style={{background: mod.color + '44', border: `1px solid ${mod.color}88`}}>
                     Save Link
                   </button>
@@ -979,12 +1015,12 @@ export function CourseCurriculumView() {
                 </div>
 
                 <div className="flex items-center gap-2 pt-1">
-                  <button 
+                  <button
                     onClick={() => fileInputRef.current?.click()}
                     className="flex-1 py-2 px-3 rounded-lg border border-dashed border-cyan-500/50 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-bold flex items-center justify-center gap-1.5 transition">
                     <i className="ph ph-file-arrow-up text-sm"></i> Upload File to R2
                   </button>
-                  <button 
+                  <button
                     onClick={() => folderInputRef.current?.click()}
                     className="py-2 px-3 rounded-lg border border-dashed border-purple-500/50 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-xs font-bold flex items-center justify-center gap-1.5 transition">
                     <i className="ph ph-folder-arrow-up text-sm"></i> Upload Folder / Bundle
@@ -996,31 +1032,81 @@ export function CourseCurriculumView() {
                 {saved ? (
                   <div className="flex-1 flex items-center gap-2 overflow-hidden">
                     <span className="text-[11px] text-cyan-300 font-mono truncate bg-slate-900/90 px-2.5 py-1 rounded border border-slate-800">{saved}</span>
-                    <a 
-                      href={previewFinalUrl} 
-                      target="_blank" 
+                    <a
+                      href={mod.slug === 'quiz' ? `/study-island/#/quiz?quiz_url=${encodeURIComponent(saved)}&chapter_title=${encodeURIComponent(chapter.title)}` : previewFinalUrl}
+                      target="_blank"
                       rel="noreferrer"
                       className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300 border border-cyan-500/40 flex items-center gap-1 transition shadow">
-                      <i className="ph ph-arrow-square-out text-xs"></i> Preview ↗
+                      <i className="ph ph-arrow-square-out text-xs"></i> {mod.slug === 'quiz' ? 'Launch Quiz ↗' : 'Preview ↗'}
                     </a>
+                    {mod.slug === 'quiz' && (
+                      <a
+                        href={saved.startsWith('http') || saved.startsWith('/') ? saved : `/${saved}`}
+                        download={saved.split('/').pop() || 'quiz.csv'}
+                        className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1 transition"
+                        title="Download CSV file"
+                      >
+                        <i className="ph ph-download-simple"></i> CSV
+                      </a>
+                    )}
                   </div>
                 ) : (
                   <span className="flex-1 text-[10px] text-slate-500 italic flex items-center gap-1">
                     <i className="ph ph-cloud-arrow-up"></i> Drop files here or click "Upload / Edit" to add content
                   </span>
                 )}
-                
-                <button 
+
+                <button
                   onClick={() => fileInputRef.current?.click()}
                   className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 flex items-center gap-1 transition">
                   <i className="ph ph-upload-simple"></i> Upload File
                 </button>
 
-                <button 
-                  onClick={() => setEditing(true)} 
+                <button
+                  onClick={() => setEditing(true)}
                   className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center gap-1 transition">
                   <i className="ph ph-pencil-simple"></i> Edit Link
                 </button>
+              </div>
+            )}
+
+            {/* Quiz Document & Google Sheets Integration Helper */}
+            {mod.slug === 'quiz' && (
+              <div className="mt-3 pt-3 border-t border-slate-700/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-emerald-300 flex items-center gap-1.5">
+                    <i className="ph ph-file-csv text-emerald-400"></i> Universal Quiz Document Format &amp; Google Sheets
+                  </span>
+                  <a
+                    href="/data/light_and_shadows_quiz.csv"
+                    download="light_and_shadows_quiz.csv"
+                    className="px-2 py-1 rounded text-[10px] font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 flex items-center gap-1 transition"
+                  >
+                    <i className="ph ph-download-simple"></i> Download CSV Template
+                  </a>
+                </div>
+                <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                  <p className="text-slate-300 font-semibold">
+                    📋 Standard CSV Columns: <code className="text-cyan-300 bg-slate-950 px-1 py-0.5 rounded">question_id, section_id, text, option_a, option_b, option_c, option_d, correct_option, bloom_level, difficulty, lo_id, lo_title, hint, explanation, icon</code>
+                  </p>
+                  <p className="text-slate-400">
+                    💡 <strong>Google Sheets sync:</strong> File &gt; Share &gt; Publish to web &gt; Select Sheet &gt; Comma-separated values (.csv) &gt; Paste published URL above.
+                  </p>
+                  {(!saved || saved.trim() === '') && (
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUrl('/data/light_and_shadows_quiz.csv');
+                          saveModalityUrl(chapter, 'quiz', '/data/light_and_shadows_quiz.csv');
+                        }}
+                        className="px-2.5 py-1 rounded bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-[10px] font-bold text-cyan-300 flex items-center gap-1 transition"
+                      >
+                        ⚡ Quick Link Light &amp; Shadows Quiz CSV (/data/light_and_shadows_quiz.csv)
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1092,11 +1178,8 @@ export function CourseCurriculumView() {
 
       const ChapterCard = ({ chapter }) => {
         const [open, setOpen] = React.useState(false);
-        const chapterCustomMods = chapter.custom_modalities || [];
-        const allMods = [...DEFAULT_MODALITIES, ...chapterCustomMods, ...customModalities];
-        
         const loadedMods = chapterModalities[chapter.id] || {};
-        
+
         const expVal = loadedMods['experience'];
         const hasExp = expVal && typeof expVal === 'string' && expVal.trim() !== '';
         const expEarned = hasExp ? 1 : 0;
@@ -1119,13 +1202,13 @@ export function CourseCurriculumView() {
         const isComplete = earnedPoints >= totalPointsRequired;
 
         return (
-          <div className="rounded-2xl p-5 space-y-4 transition-all duration-300 shadow-2xl" 
+          <div className="rounded-2xl p-5 space-y-4 transition-all duration-300 shadow-2xl"
                style={{
                  background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.95) 0%, rgba(7, 13, 24, 0.98) 100%)',
                  border: '1px solid rgba(0, 240, 255, 0.28)',
                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12)'
                }}>
-            
+
             {/* Main Header row */}
             <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800/90">
               <div className="flex items-center gap-3.5">
@@ -1160,14 +1243,14 @@ export function CourseCurriculumView() {
 
                 <button onClick={() => publishChapter(chapter)}
                   className={`text-xs px-3 py-1.5 rounded-xl font-bold border transition shadow flex items-center gap-1 ${
-                    chapter.is_published 
-                      ? 'bg-emerald-500/25 border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/35' 
+                    chapter.is_published
+                      ? 'bg-emerald-500/25 border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/35'
                       : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
                   }`}>
                   {chapter.is_published ? '🟢 LIVE' : '📴 DRAFT'}
                 </button>
 
-                <button onClick={() => setOpen(!open)} 
+                <button onClick={() => setOpen(!open)}
                   className="text-xs px-3.5 py-1.5 rounded-xl font-extrabold flex items-center gap-1.5 transition shadow"
                   style={{ background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(59, 130, 246, 0.25))', border: '1px solid rgba(0, 240, 255, 0.5)', color: '#00F0FF' }}>
                   {open ? '▲ Close Content' : '▼ Manage Content'}
@@ -1209,8 +1292,8 @@ export function CourseCurriculumView() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
                 {/* 1. Experience */}
                 <div className={`px-3 py-1.5 rounded-lg border flex items-center justify-between font-mono font-bold transition ${
-                  hasExp 
-                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' 
+                  hasExp
+                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                     : 'bg-slate-800/80 border-slate-700/80 text-slate-300'
                 }`}>
                   <span className="flex items-center gap-1">💡 1 Experience</span>
@@ -1219,10 +1302,10 @@ export function CourseCurriculumView() {
 
                 {/* 2. Experiments */}
                 <div className={`px-3 py-1.5 rounded-lg border flex items-center justify-between font-mono font-bold transition ${
-                  expCount >= 4 
-                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' 
-                    : expCount > 0 
-                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' 
+                  expCount >= 4
+                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                    : expCount > 0
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
                     : 'bg-slate-800/80 border-slate-700/80 text-slate-300'
                 }`}>
                   <span className="flex items-center gap-1">🧪 4 Experiments</span>
@@ -1233,8 +1316,8 @@ export function CourseCurriculumView() {
 
                 {/* 3. Quiz */}
                 <div className={`px-3 py-1.5 rounded-lg border flex items-center justify-between font-mono font-bold transition ${
-                  hasQuiz 
-                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' 
+                  hasQuiz
+                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                     : 'bg-slate-800/80 border-slate-700/80 text-slate-300'
                 }`}>
                   <span className="flex items-center gap-1">📝 1 Quiz</span>
@@ -1243,10 +1326,10 @@ export function CourseCurriculumView() {
 
                 {/* 4. Stories Videos */}
                 <div className={`px-3 py-1.5 rounded-lg border flex items-center justify-between font-mono font-bold transition ${
-                  storiesCount >= 4 
-                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' 
-                    : storiesCount > 0 
-                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' 
+                  storiesCount >= 4
+                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                    : storiesCount > 0
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
                     : 'bg-slate-800/80 border-slate-700/80 text-slate-300'
                 }`}>
                   <span className="flex items-center gap-1">📖 4 Stories</span>
@@ -1301,7 +1384,7 @@ export function CourseCurriculumView() {
             )}
           </div>
         );
-      
+
 
       };
 
@@ -1402,18 +1485,21 @@ export function CourseCurriculumView() {
                       <div
                         key={res.id}
                         onClick={() => {
+                          const resolvedClassName = res.subjects?.classes?.name || res.class_name || 'Class';
+                          const resolvedSubjectName = res.subjects?.name || 'Subject';
+                          const resolvedSubjectIcon = res.subjects?.icon || '📚';
                           setSearchQuery('');
                           setSearchResults([]);
                           setStep('chapters');
-                          setSelectedClass({ name: res.class_name });
-                          setSelectedSubject({ name: res.subject_name, icon: '📚' });
-                          loadChapters({ id: res.subject_id, name: res.subject_name });
+                          setSelectedClass({ name: resolvedClassName });
+                          setSelectedSubject({ name: resolvedSubjectName, icon: resolvedSubjectIcon });
+                          loadChapters({ id: res.subject_id, name: resolvedSubjectName });
                         }}
                         className="p-2 rounded-lg hover:bg-slate-800 cursor-pointer flex items-center justify-between text-xs transition"
                       >
                         <div>
                           <p className="font-bold text-white">{res.title}</p>
-                          <p className="text-[10px] text-slate-400">{res.class_name} → {res.subject_name}</p>
+                          <p className="text-[10px] text-slate-400">{res.subjects?.classes?.name || res.class_name || 'Class'} → {res.subjects?.name || 'Subject'}</p>
                         </div>
                         <span className={`text-[9px] px-2 py-0.5 rounded font-bold ${res.is_published ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
                           {res.is_published ? 'LIVE' : 'DRAFT'}
@@ -1467,7 +1553,7 @@ export function CourseCurriculumView() {
                     const isExcellent = statusText.toLowerCase() === 'excellent';
                     const isNeedsAttention = statusText.toLowerCase().includes('need') || statusText.toLowerCase().includes('attention');
                     const isOnTrack = statusText.toLowerCase().includes('track');
-                    
+
                     // Default to 0% progress unless actual content progress exists
                     const progressPercent = cls.progress !== undefined ? cls.progress : 0;
                     const isComplete = progressPercent === 100;
@@ -1476,7 +1562,7 @@ export function CourseCurriculumView() {
                     return (
                       <button key={cls.id} onClick={() => { setSelectedClass(cls); setStep('subjects'); loadSubjects(cls); }}
                         className="glass-panel p-5 border border-slate-700/60 rounded-xl text-left hover:border-cyan-500/50 hover:bg-cyan-500/5 transition group space-y-3 relative overflow-hidden">
-                        
+
                         {/* Header & Status Badge */}
                         <div className="flex items-center justify-between">
                           <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-xl">🏫</div>
@@ -1588,7 +1674,7 @@ export function CourseCurriculumView() {
                           <p className="text-sm font-bold text-white group-hover:text-cyan-300 transition">{subj.name}</p>
                           <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{subj.description}</p>
                         </div>
-                        
+
                         {/* Visible Upload Progress Bar */}
                         <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
                           <div className="flex items-center justify-between text-[10px]">
@@ -1621,7 +1707,7 @@ export function CourseCurriculumView() {
               {showAddSubject && (
                 <div className="glass-panel p-5 border border-cyan-500/30 space-y-3">
                   <p className="text-sm font-bold text-cyan-300">✚ Create Subject in {selectedClass.name}</p>
-                  
+
                   {/* Icon Quick Picker */}
                   <div>
                     <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Pick Icon</label>
@@ -1886,7 +1972,7 @@ export function CourseCurriculumView() {
                           value={activeMultiModal.itemData.icon_png || ''}
                           onChange={e => setActiveMultiModal({ ...activeMultiModal, itemData: { ...activeMultiModal.itemData, icon_png: e.target.value } })}
                           className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono outline-none focus:border-cyan-500" />
-                        
+
                         <label className="py-1.5 px-3 rounded-lg border border-dashed border-cyan-500/60 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition whitespace-nowrap">
                           <i className="ph ph-image-square text-sm"></i> Upload PNG
                           <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={async (e) => {
@@ -1920,7 +2006,7 @@ export function CourseCurriculumView() {
                           }} />
                         </label>
                       </div>
-                      
+
                       {activeMultiModal.itemData.icon_png && (
                         <div className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-950 border border-cyan-500/30 mt-1">
                           <div className="w-7 h-7 rounded bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -1940,7 +2026,7 @@ export function CourseCurriculumView() {
                           value={activeMultiModal.itemData.url || ''}
                           onChange={e => setActiveMultiModal({ ...activeMultiModal, itemData: { ...activeMultiModal.itemData, url: e.target.value } })}
                           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white outline-none" />
-                        
+
                         <div className="flex items-center gap-2">
                           <label className="flex-1 py-2 px-3 rounded-lg border border-dashed border-cyan-500/50 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition">
                             <i className="ph ph-file-arrow-up text-sm"></i> Direct Upload HTML to R2

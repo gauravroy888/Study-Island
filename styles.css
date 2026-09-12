@@ -9,9 +9,9 @@
     --text-main: #f3f4f6;
     --text-muted: #9ca3af;
     --border-color: rgba(255, 255, 255, 0.1);
-    
+
     --font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    
+
     --glow-primary: 0 0 20px rgba(0, 242, 254, 0.4);
     --glow-purple: 0 0 20px rgba(176, 92, 255, 0.4);
 }
@@ -564,13 +564,59 @@ footer {
     .discovery-widget { position: relative; right: auto; top: auto; transform: none; margin-top: 50px; width: 100%; }
     .hero { padding-top: 120px; flex-direction: column; text-align: center; }
     .hero-actions { justify-content: center; }
-    
+
     .showcase-section, .showcase-section.reverse {
         flex-direction: column;
         text-align: center;
     }
-    
+
     .module-card {
         text-align: center;
     }
+}
+
+/* ── WCAG 2.2 ACCESSIBILITY HARDENING ────────────────────────────────── */
+
+/* 2.4.11 / 2.4.13 Focus Appearance: Minimum 2px visible focus ring */
+:focus-visible {
+    outline: 2px solid var(--primary-color, #00f2fe) !important;
+    outline-offset: 2px !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--primary-color, #00f2fe) !important;
+    outline-offset: 2px !important;
+}
+
+/* 2.3.3 Animation from Interactions & Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .showcase-image img {
+        animation: none !important;
+    }
+}
+
+/* Screen reader only utility class */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
 }

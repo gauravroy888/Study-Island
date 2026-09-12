@@ -1,10 +1,22 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   base: './',
+  resolve: {
+    alias: {
+      '@supabase/supabase-js': path.resolve(__dirname, 'node_modules/@supabase/supabase-js'),
+      'react': path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      'lucide-react': path.resolve(__dirname, 'node_modules/lucide-react')
+    }
+  },
   build: {
     outDir: '../../teacher',
     emptyOutDir: true,

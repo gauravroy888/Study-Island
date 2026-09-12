@@ -1,11 +1,39 @@
 import React from 'react';
-import { SUPABASE_URL, SUPABASE_KEY } from '../supabase.js';
+import { supabase, SUPABASE_URL, SUPABASE_KEY } from '../supabase.js';
 
 export function CustomCoursesView() {
-      const SUPABASE_URL = 'https://qmyrxvtbzlbnvzxypnus.supabase.co';
-      const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFteXJ4dnRiemxibnZ6eHlwbnVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA4OTcsImV4cCI6MjA5NTM5Njg5N30.ABvW_oBzXC2Ffxm5ToLh6t4WmdKPdtg9SyfeAE76iJo';
-      const R2_CDN = 'https://pub-670b98370fe642a2be08ee37cbfd385f.r2.dev';
-      const sb = (path, opts={}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation', ...opts.headers }, ...opts });
+      const _accessTokenRef = React.useRef(null);
+      React.useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          _accessTokenRef.current = session?.access_token ?? null;
+        });
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
+          _accessTokenRef.current = session?.access_token ?? null;
+        });
+        return () => subscription?.unsubscribe();
+      }, []);
+
+      const sb = async (path, opts = {}) => {
+        let token = _accessTokenRef.current;
+        if (!token) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          token = sessionData?.session?.access_token;
+          _accessTokenRef.current = token;
+        }
+        if (!token) {
+          throw new Error('CustomCoursesView: No authenticated session — Supabase call blocked.');
+        }
+        return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+            ...opts.headers
+          },
+          ...opts
+        });
+      };
 
       const [courses, setCourses] = React.useState([]);
       const [loading, setLoading] = React.useState(false);
@@ -18,9 +46,7 @@ export function CustomCoursesView() {
 
       const showToast = (msg, type='success') => { setToast({ msg, type }); setTimeout(()=>setToast(null),3500); };
 
-      React.useEffect(() => { loadCourses(); }, []);
-
-      const loadCourses = async () => {
+      const loadCourses = React.useCallback(async () => {
         setLoading(true);
         try {
           const r = await sb('custom_courses?select=*&order=display_order');
@@ -33,9 +59,22 @@ export function CustomCoursesView() {
             const updated = list.find(c => c.id === selectedCourse.id);
             if (updated) setSelectedCourse(updated);
           }
-        } catch(e) { setCourses([]); }
+        } catch { setCourses([]); }
         setLoading(false);
-      };
+      }, [selectedCourse]);
+
+      React.useEffect(() => {
+        let isMounted = true;
+        const timer = setTimeout(() => {
+          if (isMounted) {
+            loadCourses();
+          }
+        }, 0);
+        return () => {
+          isMounted = false;
+          clearTimeout(timer);
+        };
+      }, [loadCourses]);
 
       const addCourse = async () => {
         if (!newCourse.title.trim()) return showToast('Course title required', 'error');
@@ -67,7 +106,7 @@ export function CustomCoursesView() {
           } else {
             showToast(d.message || 'Error creating course', 'error');
           }
-        } catch(e) { showToast('Network error', 'error'); }
+        } catch { showToast('Network error', 'error'); }
       };
 
       const updateSelectedCourse = async (updatedFields) => {
@@ -80,7 +119,7 @@ export function CustomCoursesView() {
           } else {
             showToast('Failed to update course', 'error');
           }
-        } catch(e) { showToast('Network error', 'error'); }
+        } catch { showToast('Network error', 'error'); }
       };
 
       const togglePublish = async (course) => {

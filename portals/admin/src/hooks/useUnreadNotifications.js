@@ -10,13 +10,14 @@ export function useUnreadNotifications() {
     if (userStr) {
       try {
         currentUser = JSON.parse(userStr);
-      } catch (e) {
+      } catch {
         return;
       }
     }
     
     if (!currentUser) return;
 
+    let isMounted = true;
     const fetchUnreadCount = async () => {
       const { count } = await supabase
         .from('notifications')
@@ -24,12 +25,12 @@ export function useUnreadNotifications() {
         .eq('user_email', currentUser.email)
         .eq('is_read', false);
       
-      if (count !== null) {
+      if (count !== null && isMounted) {
         setUnreadCount(count);
       }
     };
 
-    fetchUnreadCount();
+    void fetchUnreadCount();
 
     const subscription = supabase.channel('public:notifications:unread')
       .on('postgres_changes', { 
@@ -38,11 +39,12 @@ export function useUnreadNotifications() {
         table: 'notifications',
         filter: `user_email=eq.${currentUser.email}`
       }, () => {
-        fetchUnreadCount();
+        if (isMounted) void fetchUnreadCount();
       })
       .subscribe();
 
     return () => {
+      isMounted = false;
       supabase.removeChannel(subscription);
     };
   }, []);

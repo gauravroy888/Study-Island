@@ -1,56 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import Card from '../components/Card';
 import { Users, MessageSquare } from 'lucide-react';
-import { supabase } from '../supabase';
 import ChatInterface from '../components/ChatInterface';
-import { useLocation } from 'react-router-dom';
 
 export default function Chats() {
   const [activeTab, setActiveTab] = useState('direct');
-  const [currentUser, setCurrentUser] = useState(() => {
+  const [currentUser] = useState(() => {
     try {
       const userStr = localStorage.getItem('edtech_user');
       return userStr ? JSON.parse(userStr) : null;
-    } catch (e) {
+    } catch {
       return null;
     }
   });
-  const [announcements, setAnnouncements] = useState([]);
   const [unreadCounts, setUnreadCounts] = useState({ direct: 0, teachers: 0 });
-  const location = useLocation();
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const userParam = params.get('user');
-    if (userParam) {
-      localStorage.setItem('edtech_user', userParam);
-      setCurrentUser(JSON.parse(userParam));
-    } else {
-      const userStr = localStorage.getItem('edtech_user');
-      if (userStr) {
-        try { setCurrentUser(JSON.parse(userStr)); } catch (e) {}
-      }
-      // Bug 7 fix: removed the fake identity fallback. If no user is found in localStorage,
-      // simply stay null — ChatInterface will render a graceful "not logged in" state
-      // instead of silently saving messages under a fake identity in the DB.
-    }
-  }, [location.search]);
-
-  // Fetch announcements
-  useEffect(() => {
-    const fetchAnnouncements = async () => {
-      const { data } = await supabase.from('announcements').select('*').order('createdAt', { ascending: false });
-      if (data) setAnnouncements(data);
-    };
-
-    fetchAnnouncements();
-
-    const subscription = supabase.channel('student_announcements')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, fetchAnnouncements)
-      .subscribe();
-
-    return () => { supabase.removeChannel(subscription); };
-  }, []);
 
   // Bug 3 fix: stable callback reference prevents re-render cascade when passed to ChatInterface
   const handleUnreadCountChange = useCallback((counts) => {

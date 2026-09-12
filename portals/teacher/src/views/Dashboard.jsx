@@ -1,22 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Card from '../components/Card';
-import { Users, Calendar, Video, FileText, ArrowRight, TrendingUp, PlusCircle, Tv, Megaphone, BellRing, ShieldAlert, X } from 'lucide-react';
+import {
+  Users,
+  Calendar,
+  TrendingUp,
+  ArrowRight,
+  Video,
+  X,
+  Tv,
+  Megaphone,
+  FileText
+} from 'lucide-react';
 import { supabase } from '../supabase';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
-    totalStudents: 320,
-    classesToday: 4,
+    totalStudents: 0,
+    classesToday: 0,
     activeTests: 2,
     upcomingClasses: [],
     recentTests: []
   });
-  const [loading, setLoading] = useState(true);
   const [latestBroadcast, setLatestBroadcast] = useState(null);
 
+  const loadLatestBroadcast = useCallback(async () => {
+    try {
+      const { data } = await supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(1);
+      if (data && data.length > 0) {
+        const bcast = data[0];
+        const dismissedId = localStorage.getItem('edtech_dismissed_dashboard_broadcast');
+        if (dismissedId !== (bcast.id?.toString() || bcast.title)) {
+          setLatestBroadcast(bcast);
+        }
+      }
+    } catch {
+      /* ignore load error */
+    }
+  }, []);
+
+  const loadTeacherStats = useCallback(async () => {
+    try {
+      const { data: studentsData } = await supabase.from('profiles').select('id').eq('role', 'student');
+      const { data: testsData } = await supabase.from('tests').select('*').order('created_at', { ascending: false });
+      const { data: liveData } = await supabase.from('live_classes').select('*').eq('class_name', 'Class 6th').order('start_time', { ascending: true });
+
+      const totalStudentsCount = studentsData && studentsData.length > 0 ? studentsData.length : 5;
+      const todayClasses = liveData && liveData.length > 0 ? liveData.length : 2;
+
+      setStats({
+        totalStudents: totalStudentsCount,
+        classesToday: todayClasses,
+        activeTests: testsData ? testsData.length : 1,
+        upcomingClasses: liveData && liveData.length > 0 ? liveData : [
+          { id: 1, title: 'Class 6th Physics & Optics', class_name: 'Class 6th', time: '10:00 AM', room: 'Lab 3 (3D VR)' },
+          { id: 2, title: 'Class 6th Light & Shadows Lab', class_name: 'Class 6th', time: '01:30 PM', room: 'Sim Lab 2' }
+        ],
+        recentTests: testsData && testsData.length > 0 ? testsData.slice(0, 3) : [
+          { id: 1, title: 'Optics & Light Ray Diagram Quiz', type: 'MCQ', duration: 30, questions: [1, 2, 3, 4] }
+        ]
+      });
+    } catch (err) {
+      console.error('Failed to load teacher stats:', err);
+    }
+  }, []);
+
   useEffect(() => {
-    loadTeacherStats();
-    loadLatestBroadcast();
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) {
+        await loadTeacherStats();
+        await loadLatestBroadcast();
+      }
+    };
+    void init();
 
     // Real-time BroadcastChannel sync
     let bc = null;
@@ -24,7 +80,7 @@ export default function Dashboard() {
       try {
         bc = new BroadcastChannel('edtech_platform_sync');
         bc.onmessage = (e) => {
-          if (e.data?.type === 'BROADCAST_ALERT') {
+          if (e.data?.type === 'BROADCAST_ALERT' && isMounted) {
             setLatestBroadcast({
               title: e.data.title || 'Platform Announcement',
               text: e.data.message || e.data.text,
@@ -33,35 +89,25 @@ export default function Dashboard() {
             });
           }
         };
-      } catch (err) {}
+      } catch {
+        /* ignore error */
+      }
     }
 
     const sub = supabase.channel('teacher_dashboard_broadcasts')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, (payload) => {
-        if (payload.new) {
+        if (payload.new && isMounted) {
           setLatestBroadcast(payload.new);
         }
       })
       .subscribe();
 
     return () => {
+      isMounted = false;
       if (bc) bc.close();
       supabase.removeChannel(sub);
     };
-  }, []);
-
-  async function loadLatestBroadcast() {
-    try {
-      const { data } = await supabase.from('announcements').select('*').order('createdAt', { ascending: false }).limit(1);
-      if (data && data.length > 0) {
-        const bcast = data[0];
-        const dismissedId = localStorage.getItem('edtech_dismissed_dashboard_broadcast');
-        if (dismissedId !== (bcast.id?.toString() || bcast.title)) {
-          setLatestBroadcast(bcast);
-        }
-      }
-    } catch (e) {}
-  }
+  }, [loadLatestBroadcast, loadTeacherStats]);
 
   const handleDismissDashboardBroadcast = () => {
     if (latestBroadcast) {
@@ -70,39 +116,9 @@ export default function Dashboard() {
     }
   };
 
-  async function loadTeacherStats() {
-    setLoading(true);
-    try {
-      const { data: classesData } = await supabase.from('classes').select('*');
-      const { data: testsData } = await supabase.from('tests').select('*').order('created_at', { ascending: false });
-      const { data: liveData } = await supabase.from('live_classes').select('*').order('start_time', { ascending: true });
-
-      const totalStudentsCount = classesData ? classesData.reduce((acc, c) => acc + (c.student_count || 32), 0) : 320;
-      const todayClasses = liveData ? liveData.length : (classesData ? classesData.length : 4);
-
-      setStats({
-        totalStudents: totalStudentsCount || 320,
-        classesToday: todayClasses || 4,
-        activeTests: testsData ? testsData.length : 2,
-        upcomingClasses: liveData && liveData.length > 0 ? liveData : [
-          { id: 1, title: 'Class 6th Physics & Optics', class_name: 'Class 6th', time: '10:00 AM', room: 'Lab 3 (3D VR)' },
-          { id: 2, title: 'Class 7th Thermal Dynamics', class_name: 'Class 7th', time: '01:30 PM', room: 'Sim Lab 2' }
-        ],
-        recentTests: testsData && testsData.length > 0 ? testsData.slice(0, 3) : [
-          { id: 1, title: 'Optics & Light Ray Diagram Quiz', type: 'MCQ', duration: 30, questions: [1, 2, 3, 4] },
-          { id: 2, title: 'Thermal Energy & Kinetics Test', type: 'QA', duration: 45, questions: [1, 2] }
-        ]
-      });
-    } catch (err) {
-      console.error('Failed to load teacher stats:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <div className="view-container animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      
+
       {/* Welcome Hero Banner */}
       <div style={{
         background: 'linear-gradient(135deg, var(--brand-glow, rgba(0, 240, 255, 0.15)), rgba(168, 85, 247, 0.15), var(--brand-secondary, rgba(59, 130, 246, 0.15)))',
@@ -271,7 +287,7 @@ export default function Dashboard() {
               <Users size={24} />
             </div>
             <div>
-              <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>Total Students</p>
+              <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>Class 6th Students</p>
               <h3 style={{ margin: '4px 0 0 0', fontSize: '1.5rem', fontWeight: '800', color: 'white' }}>{stats.totalStudents}</h3>
             </div>
           </div>

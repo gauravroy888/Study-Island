@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import Card from '../components/Card';
-import { PlusCircle, Search, Trash2, Edit2, Database, X, Save } from 'lucide-react';
+import { PlusCircle, Search, Trash2, Database, X, Save } from 'lucide-react';
 
 export default function QuestionBank() {
   const [questions, setQuestions] = useState([]);
@@ -24,7 +24,10 @@ export default function QuestionBank() {
 
   const fetchQuestions = async () => {
     setLoading(true);
-    const currentUser = JSON.parse(localStorage.getItem('edtech_user') || '{}');
+    let currentUser = {};
+    try {
+      currentUser = JSON.parse(localStorage.getItem('edtech_user') || '{}');
+    } catch { /* ignore */ }
     const { data, error } = await supabase
       .from('question_bank')
       .select('*')
@@ -40,7 +43,12 @@ export default function QuestionBank() {
   };
 
   useEffect(() => {
-    fetchQuestions();
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await fetchQuestions();
+    };
+    void init();
+    return () => { isMounted = false; };
   }, []);
 
   const handleSaveQuestion = async () => {

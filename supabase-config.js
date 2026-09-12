@@ -18,7 +18,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
             // Check profiles table for user role, name, and avatar
             const { data: profile, error: profileErr } = await supabase
                 .from('profiles')
-                .select('*')
+                .select('id, auth_id, email, name, role, avatar_url, department, age, timetable, is_archived')
                 .eq('email', userEmail)
                 .single();
             if (profile) {

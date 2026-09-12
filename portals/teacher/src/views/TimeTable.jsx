@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Card from '../components/Card';
 import { supabase } from '../supabase';
 import { usePresence } from '../hooks/usePresence';
-import { BookOpen, Video, Clock, MapPin, Sparkles } from 'lucide-react';
+import { BookOpen, Video, Sparkles } from 'lucide-react';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TIME_SLOTS = [
@@ -20,7 +20,7 @@ export default function TimeTable() {
   const [updates, setUpdates] = useState([]);
   const [liveBanner, setLiveBanner] = useState('');
 
-  const fetchTimetable = async () => {
+  const fetchTimetable = useCallback(async () => {
     try {
       const uStr = localStorage.getItem('edtech_teacher_user') || localStorage.getItem('edtech_user');
       const user = uStr ? JSON.parse(uStr) : { email: 'gauravroy476@gmail.com', name: 'Gaurav' };
@@ -57,9 +57,9 @@ export default function TimeTable() {
     } catch (err) {
       console.error('Error fetching teacher timetable:', err);
     }
-  };
+  }, []);
 
-  const fetchUpdates = async () => {
+  const fetchUpdates = useCallback(async () => {
     try {
       const { data } = await supabase
         .from('notifications')
@@ -69,22 +69,35 @@ export default function TimeTable() {
         .limit(5);
 
       if (data) setUpdates(data);
-    } catch (e) {}
-  };
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
-    fetchTimetable();
-    fetchUpdates();
-  }, []);
+    let isMounted = true;
+    const init = async () => {
+      if (!isMounted) return;
+      await fetchTimetable();
+      if (!isMounted) return;
+      await fetchUpdates();
+    };
+    void init();
+    return () => { isMounted = false; };
+  }, [fetchTimetable, fetchUpdates]);
 
   // Listen to WebSocket broadcasts
   useEffect(() => {
     if (lastMessage?.type === 'timetable_update') {
-      fetchTimetable();
-      setLiveBanner('⚡ Schedule updated in real time by Admin!');
-      setTimeout(() => setLiveBanner(''), 4000);
+      const bannerTimer = setTimeout(() => {
+        void fetchTimetable();
+        setLiveBanner('⚡ Schedule updated in real time by Admin!');
+      }, 0);
+      const clearTimer = setTimeout(() => setLiveBanner(''), 4000);
+      return () => {
+        clearTimeout(bannerTimer);
+        clearTimeout(clearTimer);
+      };
     }
-  }, [lastMessage]);
+  }, [lastMessage, fetchTimetable]);
 
   return (
     <div className="view-container animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

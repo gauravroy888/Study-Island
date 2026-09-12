@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from "react";
 import { HashRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import ChapterShell from "./components/ChapterShell.jsx";
 import { ThemeProvider } from "./ThemeContext.jsx";
+import AITutorWidget from "./components/AITutorWidget.jsx";
 
 const ChapterDetailView     = lazy(() => import("./views/ChapterDetailView.jsx"));
 const QuizView                = lazy(() => import("./views/QuizView.jsx"));
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        <AITutorWidget />
       </HashRouter>
     </ThemeProvider>
   );

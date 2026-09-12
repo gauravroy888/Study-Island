@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Search, Mail, BookOpen, Star, Plus, ShieldCheck, CheckCircle, MessageSquare, ExternalLink, X, Loader2, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Users, Search, BookOpen, Plus, ShieldCheck, CheckCircle, MessageSquare, X, Loader2, AlertCircle } from 'lucide-react';
 import Card from '../components/Card';
 import { supabase } from '../supabase';
 import { usePresence } from '../hooks/usePresence';
@@ -23,102 +23,97 @@ export default function Teachers() {
   // Presence comes from PresenceProvider — no own channel needed
   const { isOnline } = usePresence();
 
-  useEffect(() => {
-    loadTeachers();
-  }, []);
-
-
   // Fetch only real database records from Supabase
-  const loadTeachers = async () => {
+  const loadTeachers = useCallback(async () => {
     setLoading(true);
     try {
       // 1. Fetch from 'profiles' table where role is teacher
-      const { data: profData } = await supabase
+      const { data: profData, error: profErr } = await supabase
         .from('profiles')
-        .select('*')
-        .or('role.eq.teacher,role.eq.TEACHER');
+        .select('id, auth_id, email, name, role, avatar_url, department, age, timetable, is_archived')
+        .eq('role', 'teacher')
+        .order('name', { ascending: true });
 
-      // 2. Fetch from 'users' table where role is teacher
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('*')
-        .or('role.eq.teacher,role.eq.TEACHER');
+      if (profErr) {
+        console.error('Error fetching teachers from profiles:', profErr);
+      }
 
-      // 3. Fetch from 'teachers' table
-      const { data: teachersData } = await supabase
+      // 2. Fetch from 'teachers' table
+      const { data: legacyData, error: legErr } = await supabase
         .from('teachers')
         .select('*');
 
-      const teacherMap = new Map();
-
-      if (usersData && usersData.length > 0) {
-        usersData.forEach(u => {
-          const displayName = u.full_name || u.name || u.email.split('@')[0];
-          teacherMap.set(u.email.toLowerCase(), {
-            id: u.id,
-            name: displayName,
-            email: u.email,
-            role: u.role === 'teacher' ? 'Subject Faculty' : u.role,
-            department: u.department || 'Academic Faculty',
-            classes: ['Class 6th A'],
-            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}&backgroundColor=b6e3f4`,
-            rating: 5.0,
-            status: 'Active',
-            joined: (u.created_at || '').slice(0, 10) || new Date().toISOString().slice(0, 10)
-          });
-        });
+      if (legErr && legErr.code !== 'PGRST116') {
+        console.warn('Teachers table fetch note:', legErr.message);
       }
 
-      if (teachersData && teachersData.length > 0) {
-        teachersData.forEach(t => {
-          const emailKey = (t.email || '').toLowerCase();
-          const existing = teacherMap.get(emailKey) || {};
-          teacherMap.set(emailKey, {
-            ...existing,
-            id: t.id || existing.id,
-            name: t.name || existing.name || 'Faculty Member',
-            email: t.email || existing.email,
-            role: t.degree || t.role || existing.role || 'Teacher',
-            department: t.subject ? `${t.subject} Faculty` : existing.department || 'Academic Faculty',
-            classes: ['Class 6th A'],
-            avatar: t.avatar_url || existing.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(t.name || t.email || 'Teacher')}&backgroundColor=b6e3f4`,
-            rating: parseFloat(t.rating) || 5.0,
-            status: t.status || 'Active',
-            joined: (t.created_at || '').slice(0, 10) || existing.joined || new Date().toISOString().slice(0, 10)
-          });
-        });
-      }
+      // 3. Merge profiles and teachers table by email/name
+      const profileMap = new Map();
 
-      if (profData && profData.length > 0) {
-        profData.forEach(p => {
-          const emailKey = (p.email || '').toLowerCase();
-          const existing = teacherMap.get(emailKey) || {};
-          teacherMap.set(emailKey, {
-            ...existing,
-            id: p.id || existing.id,
-            name: p.name || existing.name || 'Faculty Member',
-            email: p.email || existing.email,
-            avatar: p.avatar_url || existing.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(p.name || p.email)}&backgroundColor=b6e3f4`
-          });
+      // Add profiles
+      (profData || []).forEach(p => {
+        const key = (p.email || p.id).toLowerCase();
+        profileMap.set(key, {
+          id: p.id,
+          name: p.full_name || p.username || 'Faculty Member',
+          email: p.email || 'N/A',
+          department: p.department || 'Academic Faculty',
+          role: p.designation || 'Subject Faculty',
+          avatar: p.avatar_url,
+          status: 'offline', // will be checked via usePresence
+          specialization: p.specialization || p.department || 'Education',
+          classes: p.assigned_classes ? (Array.isArray(p.assigned_classes) ? p.assigned_classes : [p.assigned_classes]) : ['General'],
+          phone: p.phone || 'Not provided',
+          office_hours: p.office_hours || 'By Appointment',
+          bio: p.bio || 'Faculty member contributing to academic excellence.'
         });
-      }
+      });
 
-      setTeachers(Array.from(teacherMap.values()));
-    } catch (e) {
-      console.error('Error loading teachers:', e);
-      setTeachers([]);
+      // Overlay/Add legacy teachers if not present
+      (legacyData || []).forEach(t => {
+        const key = (t.email || t.id).toLowerCase();
+        if (!profileMap.has(key)) {
+          profileMap.set(key, {
+            id: t.id,
+            name: t.name || t.full_name || 'Faculty Member',
+            email: t.email || 'N/A',
+            department: t.subject || t.department || 'Academic Faculty',
+            role: 'Subject Faculty',
+            avatar: t.avatar_url || t.image_url,
+            status: 'offline',
+            specialization: t.specialization || t.subject || 'Education',
+            classes: t.classes || ['General'],
+            phone: t.phone || 'Not provided',
+            office_hours: t.office_hours || 'By Appointment',
+            bio: t.bio || 'Faculty member contributing to academic excellence.'
+          });
+        }
+      });
+
+      setTeachers(Array.from(profileMap.values()));
+    } catch (err) {
+      console.error('Failed to load teachers:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadTeachers();
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) await loadTeachers();
+    };
+    void init();
     const profSub = supabase.channel('public:prof_teachers_sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, loadTeachers)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        if (isMounted) void loadTeachers();
+      })
       .subscribe();
-    return () => supabase.removeChannel(profSub);
-  }, []);
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(profSub);
+    };
+  }, [loadTeachers]);
 
   const departments = ['ALL', 'Academic Faculty', 'Science & Physics', 'Mathematics', 'Social Sciences'];
 
@@ -137,7 +132,7 @@ export default function Teachers() {
     setIsSubmitting(true);
     try {
       // Insert real user into Supabase users table
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('users')
         .insert([
           {

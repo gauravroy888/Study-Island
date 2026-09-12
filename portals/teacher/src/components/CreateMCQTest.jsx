@@ -1,24 +1,25 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '../supabase';
 import Card from './Card';
 import { PlusCircle, Trash2, Save, X, Database } from 'lucide-react';
 
-const classesList = ['Class 1st', 'Class 2nd', 'Class 3rd', 'Class 4th', 'Class 5th', 'Class 6th', 'Class 7th', 'Class 8th', 'Class 9th', 'Class 10th', 'Class 11th', 'Class 12th'];
+const classesList = ['Class 6th'];
+const generateRandomId = () => Date.now() + Math.random();
 
 export default function CreateMCQTest({ onCancel }) {
-  const [testInfo, setTestInfo] = useState({ title: '', assignedClass: 'Class 1st', duration: '' });
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [testInfo, setTestInfo] = useState({ title: '', assignedClass: 'Class 6th', duration: '' });
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('10:00');
-  const [endDate, setEndDate] = useState(new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(() => new Date(Date.now() + 86400000).toISOString().split('T')[0]);
   const [endTime, setEndTime] = useState('18:00');
-  
+
   const [questions, setQuestions] = useState([
     { id: 1, text: '', options: [{ id: 1, text: '', isCorrect: false }, { id: 2, text: '', isCorrect: false }] }
   ]);
 
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
   const [bankQuestions, setBankQuestions] = useState([]);
-  
+
   const fetchBankQuestions = async () => {
     const currentUser = JSON.parse(localStorage.getItem('edtech_user') || '{}');
     const { data, error } = await supabase
@@ -26,24 +27,24 @@ export default function CreateMCQTest({ onCancel }) {
       .select('*')
       .eq('type', 'mcq')
       .eq('created_by', currentUser.email || '');
-      
+
     if (!error && data) {
       setBankQuestions(data);
     }
   };
-  
+
   const openBankModal = () => {
     setIsBankModalOpen(true);
     fetchBankQuestions();
   };
-  
+
   const importQuestion = (bankQ) => {
-    setQuestions([
-      ...questions,
-      { 
-        id: Date.now() + Math.random(), 
-        text: bankQ.text, 
-        options: bankQ.options.map(opt => ({ ...opt, id: Date.now() + Math.random() })) 
+    setQuestions(prev => [
+      ...prev,
+      {
+        id: generateRandomId(),
+        text: bankQ.text,
+        options: bankQ.options.map(opt => ({ ...opt, id: generateRandomId() }))
       }
     ]);
     setIsBankModalOpen(false);
@@ -119,7 +120,7 @@ export default function CreateMCQTest({ onCancel }) {
     try {
       const startDateTime = new Date(`${startDate}T${startTime}`);
       const endDateTime = new Date(`${endDate}T${endTime}`);
-      
+
       const currentUser = JSON.parse(localStorage.getItem('edtech_user') || '{}');
       const { error } = await supabase.from('tests').insert({
         title: testInfo.title,
@@ -134,7 +135,7 @@ export default function CreateMCQTest({ onCancel }) {
       });
 
       if (error) throw error;
-      
+
       // Send notification to all students
       await supabase.from('notifications').insert({
         user_email: 'all',
@@ -159,8 +160,8 @@ export default function CreateMCQTest({ onCancel }) {
   };
 
   const inputStyle = {
-    width: '100%', padding: '10px', borderRadius: '8px', 
-    background: 'rgba(255,255,255,0.05)', border: '1px solid var(--panel-border)', 
+    width: '100%', padding: '10px', borderRadius: '8px',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid var(--panel-border)',
     color: 'white', marginBottom: '15px', colorScheme: 'dark'
   };
 
@@ -170,7 +171,7 @@ export default function CreateMCQTest({ onCancel }) {
         <h2>Create MCQ Test</h2>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-ghost" onClick={onCancel}><X size={16} /> Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave}><Save size={16} /> Save Test</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}><Save size={16} /> {isSaving ? 'Saving...' : 'Save Test'}</button>
         </div>
       </div>
 
@@ -178,7 +179,7 @@ export default function CreateMCQTest({ onCancel }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
           <div>
             <label style={{ display: 'block', fontSize: '14px', marginBottom: '5px', color: 'var(--text-secondary)' }}>Test Title</label>
-            <input type="text" style={inputStyle} placeholder="e.g., Physics Chapter 3 Quiz" 
+            <input type="text" style={inputStyle} placeholder="e.g., Physics Chapter 3 Quiz"
                    value={testInfo.title} onChange={e => setTestInfo({...testInfo, title: e.target.value})} />
           </div>
           <div>
@@ -191,11 +192,11 @@ export default function CreateMCQTest({ onCancel }) {
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '14px', marginBottom: '5px', color: 'var(--text-secondary)' }}>Duration (Mins)</label>
-            <input type="number" style={inputStyle} placeholder="e.g., 30" 
+            <input type="number" style={inputStyle} placeholder="e.g., 30"
                    value={testInfo.duration} onChange={e => setTestInfo({...testInfo, duration: e.target.value})} />
           </div>
         </div>
-        
+
         <h4 style={{ margin: '15px 0 10px', color: 'var(--text-primary)' }}>Availability Window</h4>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -229,22 +230,22 @@ export default function CreateMCQTest({ onCancel }) {
               <Trash2 size={16} color="var(--text-secondary)" />
             </button>
           </div>
-          
-          <input type="text" style={inputStyle} placeholder="Enter your question here..." 
+
+          <input type="text" style={inputStyle} placeholder="Enter your question here..."
                  value={q.text} onChange={e => updateQuestionText(q.id, e.target.value)} />
-          
+
           <div style={{ marginLeft: '20px' }}>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '10px' }}>Options (Select the correct one):</p>
             {q.options.map((opt, optIndex) => (
               <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                <input 
-                  type="radio" 
-                  name={`correct-${q.id}`} 
-                  checked={opt.isCorrect} 
+                <input
+                  type="radio"
+                  name={`correct-${q.id}`}
+                  checked={opt.isCorrect}
                   onChange={() => setCorrectOption(q.id, opt.id)}
                   style={{ width: '18px', height: '18px', accentColor: 'var(--accent-cyan)' }}
                 />
-                <input type="text" style={{...inputStyle, marginBottom: 0, flex: 1}} placeholder={`Option ${optIndex + 1}`} 
+                <input type="text" style={{...inputStyle, marginBottom: 0, flex: 1}} placeholder={`Option ${optIndex + 1}`}
                        value={opt.text} onChange={e => updateOptionText(q.id, opt.id, e.target.value)} />
                 <button className="btn btn-ghost" style={{ padding: '5px', border: 'none' }} onClick={() => removeOption(q.id, opt.id)}>
                   <X size={16} color="var(--text-secondary)" />

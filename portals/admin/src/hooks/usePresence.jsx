@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { supabase } from '../supabase';
 
 const PresenceContext = createContext({ 
   onlineEmails: new Set(), 
@@ -34,11 +35,14 @@ export function PresenceProvider({ user, children }) {
         ws = new WebSocket(`${wsProtocol}//${wsHost}`);
         wsRef.current = ws;
 
-        ws.onopen = () => {
-          if (userEmail) {
-            ws.send(JSON.stringify({ type: 'identify', email: userEmail }));
-          } else {
-            ws.send(JSON.stringify({ type: 'identify', email: null }));
+        ws.onopen = async () => {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) {
+              ws.send(JSON.stringify({ type: 'auth', token: session.access_token }));
+            }
+          } catch (err) {
+            console.warn('[WebSocket] Session fetch error:', err?.message);
           }
         };
 
@@ -52,7 +56,7 @@ export function PresenceProvider({ user, children }) {
             } else if (isComponentMounted) {
               setLastMessage(data);
             }
-          } catch (e) {}
+          } catch { /* ignore JSON parse error */ }
         };
 
         ws.onclose = () => {
@@ -65,7 +69,7 @@ export function PresenceProvider({ user, children }) {
         ws.onerror = () => {
           ws?.close();
         };
-      } catch (e) {
+      } catch {
         if (isComponentMounted) {
           reconnectTimer = setTimeout(connectWS, 3000);
         }
@@ -103,6 +107,7 @@ export function PresenceProvider({ user, children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const usePresence = () => useContext(PresenceContext);
 
 

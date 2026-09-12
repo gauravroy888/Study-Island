@@ -2,13 +2,19 @@
  * Cloudflare R2 Storage Client Helper ($0 Egress CDN)
  * Bucket Name: edtechplatform
  * Public CDN Domain: https://pub-670b98370fe642a2be08ee37cbfd385f.r2.dev
+ *
+ * SECURITY: accountId and endpoint are read from environment variables.
+ * Set CLOUDFLARE_R2_ACCOUNT_ID in your .env file or deployment secrets.
+ * Never hardcode these values in source.
  */
+
+const _r2AccountId = (typeof process !== 'undefined' && process.env && process.env.CLOUDFLARE_R2_ACCOUNT_ID) || '';
 
 const R2_CONFIG = {
   bucketName: 'edtechplatform',
   publicCdnUrl: 'https://pub-670b98370fe642a2be08ee37cbfd385f.r2.dev',
-  accountId: '21b75f7da0ec0dde4d08d3f19d2102f3',
-  endpoint: 'https://21b75f7da0ec0dde4d08d3f19d2102f3.r2.cloudflarestorage.com'
+  accountId: _r2AccountId,
+  endpoint: _r2AccountId ? `https://${_r2AccountId}.r2.cloudflarestorage.com` : ''
 };
 
 /**

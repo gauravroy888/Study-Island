@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, Sparkles, ExternalLink, PlayCircle } from 'lucide-react';
 import Card from '../components/Card';
 import ProgressBar from '../components/ProgressBar';
@@ -6,6 +6,91 @@ import { supabase } from '../supabase';
 import './Courses.css';
 
 const R2_PUBLIC_CDN_URL = 'https://pub-670b98370fe642a2be08ee37cbfd385f.r2.dev';
+
+function getFallbackCourses() {
+  return [
+    {
+      id: 'c6000000-0000-0000-0000-000000000001',
+      title: 'Class 6th Science & Physics',
+      category: 'Science',
+      subject: 'Science',
+      progress: 85,
+      icon: '💡',
+      description: 'Explore optics, light propagation, and shadow formation through 3D simulations.',
+      thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/optics.webp`
+    },
+    {
+      id: 'c6000000-0000-0000-0000-000000000002',
+      title: 'Class 6th Ancient & World History',
+      category: 'History',
+      subject: 'History',
+      progress: 45,
+      icon: '🏛️',
+      description: 'Explore ancient empires, archaeological timelines, civilizations, and historical architecture.',
+      thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/history.webp`
+    },
+    {
+      id: 'c6000000-0000-0000-0000-000000000003',
+      title: 'Class 6th World Geography & Continents',
+      category: 'Geography',
+      subject: 'Geography',
+      progress: 70,
+      icon: '🌍',
+      description: 'Discover continental tectonics, climate zones, world topography, and interactive 3D map exploration.',
+      thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/geography.webp`
+    },
+    {
+      id: 'c6000000-0000-0000-0000-000000000004',
+      title: 'Class 6th Physical Education & Sports Science',
+      category: 'Physical Education',
+      subject: 'Physical Education',
+      progress: 60,
+      icon: '🏃',
+      description: 'Study biomechanics, athletic training regimens, physiology, and sports science fundamentals.',
+      thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/pe.webp`
+    },
+    {
+      id: 'c6000000-0000-0000-0000-000000000005',
+      title: 'Class 6th Visual Arts & 3D Design',
+      category: 'Arts',
+      subject: 'Arts',
+      progress: 40,
+      icon: '🎨',
+      description: 'Master color harmony theory, spatial perspective, 3D artistic sculpting, and creative composition.',
+      thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/arts.webp`
+    },
+    {
+      id: 'c6000000-0000-0000-0000-000000000006',
+      title: 'Class 6th English Literature & Grammar',
+      category: 'English',
+      subject: 'English',
+      progress: 65,
+      icon: '📝',
+      description: 'Analyze classic literature, narrative character development, poetry syntax, and advanced grammar.',
+      thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/english.webp`
+    },
+    {
+      id: 'c6000000-0000-0000-0000-000000000007',
+      title: 'Class 6th Mathematics & Geometry',
+      category: 'Mathematics',
+      subject: 'Mathematics',
+      progress: 80,
+      icon: 'π',
+      description: 'Master algebraic expressions, geometry theorems, number theory, and spatial calculations.',
+      thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/math.webp`
+    },
+    {
+      id: 'c6000000-0000-0000-0000-000000000008',
+      title: 'Class 6th Music Theory & Acoustics',
+      category: 'Music',
+      subject: 'Music',
+      progress: 30,
+      icon: '🎵',
+      description: 'Learn harmonic scales, rhythm composition, acoustic waveforms, and orchestral instrumentation.',
+      thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/music.webp`
+    }
+  ];
+}
 
 export default function Courses() {
   const [courses, setCourses] = useState([]);
@@ -18,12 +103,7 @@ export default function Courses() {
   const user = userStr ? JSON.parse(userStr) : null;
   const userTier = user?.subscription_tier || 'free';
 
-  useEffect(() => {
-    fetchAssignedCourses();
-    fetchCustomCourses();
-  }, []);
-
-  async function fetchCustomCourses() {
+  const fetchCustomCourses = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('custom_courses')
@@ -36,21 +116,16 @@ export default function Courses() {
     } catch (e) {
       console.error('Failed to load custom courses:', e);
     }
-  }
+  }, []);
 
-  function isTierAccessible(requiredTier) {
-    const tiers = ['free', 'basic', 'premium'];
-    const requiredIdx = tiers.indexOf((requiredTier || 'free').toLowerCase());
-    const userIdx = tiers.indexOf((userTier || 'free').toLowerCase());
-    return userIdx >= requiredIdx;
-  }
-
-  async function fetchAssignedCourses() {
+  const fetchAssignedCourses = useCallback(async () => {
     setLoading(true);
     try {
-      const userStr = localStorage.getItem('edtech_user');
-      const user = userStr ? JSON.parse(userStr) : null;
-      const userClass = user?.class_name || 'Class 6th';
+      let cls = 'Class 6th';
+      try {
+        const uStr = localStorage.getItem('edtech_user');
+        if (uStr) cls = JSON.parse(uStr)?.class_name || 'Class 6th';
+      } catch { /* ignore parse error */ }
 
       const { data, error } = await supabase
         .from('courses')
@@ -61,7 +136,7 @@ export default function Courses() {
             chapter_modalities (id, modality_type, title, resource_url, content_status)
           )
         `)
-        .eq('class_name', userClass)
+        .eq('class_name', cls)
         .eq('is_published', true);
 
       if (error) {
@@ -78,91 +153,26 @@ export default function Courses() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  function getFallbackCourses() {
-    return [
-      {
-        id: 'c6000000-0000-0000-0000-000000000001',
-        title: 'Class 6th Science & Physics',
-        category: 'Science',
-        subject: 'Science',
-        progress: 85,
-        icon: '💡',
-        description: 'Explore optics, light propagation, and shadow formation through 3D simulations.',
-        thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/optics.webp`
-      },
-      {
-        id: 'c6000000-0000-0000-0000-000000000002',
-        title: 'Class 6th Ancient & World History',
-        category: 'History',
-        subject: 'History',
-        progress: 45,
-        icon: '🏛️',
-        description: 'Explore ancient empires, archaeological timelines, civilizations, and historical architecture.',
-        thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/history.webp`
-      },
-      {
-        id: 'c6000000-0000-0000-0000-000000000003',
-        title: 'Class 6th World Geography & Continents',
-        category: 'Geography',
-        subject: 'Geography',
-        progress: 70,
-        icon: '🌍',
-        description: 'Discover continental tectonics, climate zones, world topography, and interactive 3D map exploration.',
-        thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/geography.webp`
-      },
-      {
-        id: 'c6000000-0000-0000-0000-000000000004',
-        title: 'Class 6th Physical Education & Sports Science',
-        category: 'Physical Education',
-        subject: 'Physical Education',
-        progress: 60,
-        icon: '🏃',
-        description: 'Study biomechanics, athletic training regimens, physiology, and sports science fundamentals.',
-        thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/pe.webp`
-      },
-      {
-        id: 'c6000000-0000-0000-0000-000000000005',
-        title: 'Class 6th Visual Arts & 3D Design',
-        category: 'Arts',
-        subject: 'Arts',
-        progress: 40,
-        icon: '🎨',
-        description: 'Master color harmony theory, spatial perspective, 3D artistic sculpting, and creative composition.',
-        thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/arts.webp`
-      },
-      {
-        id: 'c6000000-0000-0000-0000-000000000006',
-        title: 'Class 6th English Literature & Grammar',
-        category: 'English',
-        subject: 'English',
-        progress: 65,
-        icon: '📝',
-        description: 'Analyze classic literature, narrative character development, poetry syntax, and advanced grammar.',
-        thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/english.webp`
-      },
-      {
-        id: 'c6000000-0000-0000-0000-000000000007',
-        title: 'Class 6th Mathematics & Geometry',
-        category: 'Mathematics',
-        subject: 'Mathematics',
-        progress: 80,
-        icon: 'π',
-        description: 'Master algebraic expressions, geometry theorems, number theory, and spatial calculations.',
-        thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/math.webp`
-      },
-      {
-        id: 'c6000000-0000-0000-0000-000000000008',
-        title: 'Class 6th Music Theory & Acoustics',
-        category: 'Music',
-        subject: 'Music',
-        progress: 30,
-        icon: '🎵',
-        description: 'Learn harmonic scales, rhythm composition, acoustic waveforms, and orchestral instrumentation.',
-        thumbnail_url: `${R2_PUBLIC_CDN_URL}/placeholders/music.webp`
+  useEffect(() => {
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) {
+        await Promise.all([fetchAssignedCourses(), fetchCustomCourses()]);
       }
-    ];
+    };
+    void init();
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchAssignedCourses, fetchCustomCourses]);
+
+  function isTierAccessible(requiredTier) {
+    const tiers = ['free', 'basic', 'premium'];
+    const requiredIdx = tiers.indexOf((requiredTier || 'free').toLowerCase());
+    const userIdx = tiers.indexOf((userTier || 'free').toLowerCase());
+    return userIdx >= requiredIdx;
   }
 
   function handleLaunchCourse(course, openWorld = false) {

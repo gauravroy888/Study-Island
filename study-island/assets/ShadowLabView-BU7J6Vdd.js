@@ -1,0 +1,1 @@
+import{j as a}from"./index.source-FQPQxX9-.js";function l(){return a.jsx("div",{className:"relative w-screen h-screen overflow-hidden bg-slate-950",children:a.jsx("iframe",{src:"/Shadow_Lab.html",title:"Shadow Lab - Optical Calibration",className:"w-full h-full border-0",allow:"autoplay; fullscreen"})})}export{l as default};

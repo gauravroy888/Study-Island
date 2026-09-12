@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  ExternalLink, Globe, X, Download, Maximize2, Loader2, Pin, Reply, 
-  Trash2, Check, CheckCheck, Copy, Forward, ChevronDown, CheckCircle2, Smile 
+/* eslint-disable react-refresh/only-export-components */
+import { useState, useEffect, useRef } from 'react';
+import {
+  ExternalLink, X, Download, Loader2, Pin, Reply,
+  Trash2, Copy, Forward, ChevronDown, CheckCircle2, Smile
 } from 'lucide-react';
 
 // URL detection regex
@@ -54,89 +55,97 @@ export function formatMessageWithLinks(text, query = '') {
           href={part}
           target="_blank"
           rel="noopener noreferrer"
-          className="chat-inline-link"
+          className="chat-embedded-link"
           onClick={(e) => e.stopPropagation()}
         >
-          {part}
+          {part} <ExternalLink size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />
         </a>
       );
     }
-    return query ? highlightText(part, query) : part;
+    return highlightText(part, query);
   });
+}
+
+function getDefaultMeta(url) {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.replace(/^www\./, '');
+
+    let mediaThumb = null;
+    if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
+      let videoId = null;
+      if (hostname.includes('youtu.be')) {
+        videoId = parsed.pathname.slice(1);
+      } else {
+        videoId = parsed.searchParams.get('v');
+      }
+      if (videoId) {
+        mediaThumb = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+      }
+    } else if (/\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(url)) {
+      mediaThumb = url;
+    }
+
+    return {
+      domain: hostname,
+      title: hostname.toUpperCase(),
+      description: url,
+      image: mediaThumb,
+      favicon: `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`,
+      url: url
+    };
+  } catch {
+    return { domain: 'Link', title: url, url: url };
+  }
 }
 
 /**
  * WhatsApp-style Rich Link Preview Card
  */
 export function LinkPreviewCard({ url }) {
-  const [meta, setMeta] = useState(null);
+  const [meta, setMeta] = useState(() => getDefaultMeta(url));
 
   useEffect(() => {
     let isMounted = true;
     if (!url) return;
 
-    try {
-      const parsed = new URL(url);
-      const hostname = parsed.hostname.replace(/^www\./, '');
+    // Direct fetch or fallback to thumbnail parsing without third-party proxies
+    fetch(url, { signal: AbortSignal.timeout(3000) })
+      .then(res => {
+        if (!res.ok) throw new Error('Network response not ok');
+        return res.text();
+      })
+      .then(html => {
+        if (!isMounted || !html) return;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
 
-      let youtubeThumb = null;
-      if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
-        let videoId = null;
-        if (hostname.includes('youtu.be')) {
-          videoId = parsed.pathname.slice(1);
-        } else {
-          videoId = parsed.searchParams.get('v');
-        }
-        if (videoId) {
-          youtubeThumb = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        }
-      }
+        const getOg = (property) =>
+          doc.querySelector(`meta[property="${property}"]`)?.getAttribute('content') ||
+          doc.querySelector(`meta[name="${property}"]`)?.getAttribute('content');
 
-      const defaultMeta = {
-        domain: hostname,
-        title: hostname.toUpperCase(),
-        description: url,
-        image: youtubeThumb,
-        favicon: `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`,
-        url: url
-      };
+        const defaultMeta = getDefaultMeta(url);
+        const title = getOg('og:title') || getOg('twitter:title') || doc.title || defaultMeta?.title || url;
+        const description = getOg('og:description') || getOg('twitter:description') || '';
+        const image = getOg('og:image') || getOg('twitter:image') || defaultMeta?.image;
 
-      if (!isMounted) return;
-      setMeta(defaultMeta);
+        setMeta({
+          domain: defaultMeta?.domain || 'Link',
+          title: title.trim(),
+          description: description.trim(),
+          image: image,
+          favicon: defaultMeta?.favicon,
+          url: url
+        });
+      })
+      .catch(() => {
+        // Direct fetch blocked by CORS or network timeout; defaultMeta already in state
+      });
 
-      fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(4000) })
-        .then(res => res.json())
-        .then(data => {
-          if (!isMounted || !data.contents) return;
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(data.contents, 'text/html');
-
-          const getOg = (property) =>
-            doc.querySelector(`meta[property="${property}"]`)?.getAttribute('content') ||
-            doc.querySelector(`meta[name="${property}"]`)?.getAttribute('content');
-
-          const title = getOg('og:title') || getOg('twitter:title') || doc.title || defaultMeta.title;
-          const description = getOg('og:description') || getOg('twitter:description') || '';
-          const image = getOg('og:image') || getOg('twitter:image') || defaultMeta.image;
-
-          setMeta({
-            domain: hostname,
-            title: title.trim(),
-            description: description.trim(),
-            image: image,
-            favicon: defaultMeta.favicon,
-            url: url
-          });
-        })
-        .catch(() => {});
-
-    } catch (e) {
-      if (isMounted) {
-        setMeta({ domain: 'Link', title: url, url: url });
-      }
-    }
-
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [url]);
 
   if (!meta) return null;
@@ -177,17 +186,17 @@ export function LinkPreviewCard({ url }) {
 /**
  * WhatsApp-style Hover Action Icons Beside Chat Bubble (Smiley Face + Options Chevron)
  */
-export function WhatsAppHoverActions({ 
-  isMe, 
-  onReact, 
-  onReply, 
-  onPin, 
-  isPinned, 
-  onDelete, 
-  onForward, 
+export function WhatsAppHoverActions({
+  isMe,
+  onReact,
+  onReply,
+  onPin,
+  isPinned,
+  onDelete,
+  onForward,
   onCopy,
   showDropdown,
-  setShowDropdown 
+  setShowDropdown
 }) {
   const [showReactionPill, setShowReactionPill] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
@@ -358,10 +367,10 @@ export const WhatsAppMessageActionToolbar = WhatsAppHoverActions;
  */
 export function WhatsAppReactionBadge({ reactions, currentEmail, onToggleReaction }) {
   if (!reactions || typeof reactions !== 'object') return null;
-  const entries = Object.entries(reactions).filter(([_, users]) => Array.isArray(users) && users.length > 0);
+  const entries = Object.entries(reactions).filter(([, users]) => Array.isArray(users) && users.length > 0);
   if (entries.length === 0) return null;
 
-  const totalCount = entries.reduce((acc, [_, users]) => acc + users.length, 0);
+  const totalCount = entries.reduce((acc, [, users]) => acc + users.length, 0);
   const emojis = entries.map(([emoji]) => emoji);
 
   return (
@@ -369,7 +378,7 @@ export function WhatsAppReactionBadge({ reactions, currentEmail, onToggleReactio
       className="chat-reaction-badge-whatsapp"
       onClick={(e) => {
         e.stopPropagation();
-        const userEntry = entries.find(([_, users]) => currentEmail && users.some(u => u.toLowerCase() === currentEmail.toLowerCase()));
+        const userEntry = entries.find(([, users]) => currentEmail && users.some(u => u.toLowerCase() === currentEmail.toLowerCase()));
         if (userEntry) {
           onToggleReaction(userEntry[0]);
         } else {
@@ -417,17 +426,17 @@ export function ForwardedMessageTag() {
 /**
  * WhatsApp-style Forward Modal
  */
-export function ForwardMessageModal({ 
-  message, 
-  contacts, 
-  onForward, 
-  onClose 
+export function ForwardMessageModal({
+  message,
+  contacts,
+  onForward,
+  onClose
 }) {
   const [query, setQuery] = useState('');
   const [selectedContacts, setSelectedContacts] = useState([]);
   const [isSending, setIsSending] = useState(false);
 
-  const filtered = contacts.filter(c => 
+  const filtered = contacts.filter(c =>
     (c.name && c.name.toLowerCase().includes(query.toLowerCase())) ||
     (c.email && c.email.toLowerCase().includes(query.toLowerCase()))
   );
@@ -436,7 +445,7 @@ export function ForwardMessageModal({
     const key = contact.isGroup ? contact.id : contact.email;
     setSelectedContacts(prev => {
       const exists = prev.some(c => (c.isGroup ? c.id : c.email) === key);
-      return exists 
+      return exists
         ? prev.filter(c => (c.isGroup ? c.id : c.email) !== key)
         : [...prev, contact];
     });
@@ -614,7 +623,7 @@ export function ImageLightbox({ imageUrl, onClose }) {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (err) {
+    } catch {
       window.open(imageUrl, '_blank');
     }
   };
