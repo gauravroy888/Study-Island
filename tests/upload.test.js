@@ -2,6 +2,11 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { Readable } from 'node:stream';
+import WebSocket from 'ws';
+
+if (!globalThis.WebSocket) {
+  globalThis.WebSocket = WebSocket;
+}
 
 const require = createRequire(import.meta.url);
 const {

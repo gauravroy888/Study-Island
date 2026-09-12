@@ -1,5 +1,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import WebSocket from 'ws';
+
+if (!globalThis.WebSocket) {
+  globalThis.WebSocket = WebSocket;
+}
+
 import { calculateMastery, calculateFluency } from '../study-island/src/lib/analytics-sdk.js';
 
 describe('Phase 10: Disaster Recovery — Deterministic Analytics Replayability', () => {

@@ -1,5 +1,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import WebSocket from 'ws';
+
+if (!globalThis.WebSocket) {
+  globalThis.WebSocket = WebSocket;
+}
 
 describe('Analytics Integrity: Score Fabrication & Floor Prevention', () => {
   test('Zero checkpoints must NOT fabricate engagement score of 65 or higher', async () => {
